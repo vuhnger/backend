@@ -1,0 +1,26 @@
+# Multi-Service Caddy Configuration
+# Use this when running all services (calendar, blog, strava)
+#
+# To use:
+#   1. Copy to Caddyfile: cp Caddyfile.multi Caddyfile
+#   2. Or update the volume mount in docker-compose.yml
+#
+# See ARCHITECTURE.md for details
+
+api.vuhnger.dev {
+    # Calendar service
+    reverse_proxy /calendar/* calendar-api:5001
+
+    # Blog service
+    reverse_proxy /blog/* blog-api:5002
+
+    # Strava service
+    reverse_proxy /strava/* strava-api:5003
+
+    # API Documentation
+    # Currently shows calendar service docs
+    # Future: could serve aggregated docs or a gateway
+    reverse_proxy /docs calendar-api:5001
+    reverse_proxy /redoc calendar-api:5001
+    reverse_proxy /openapi.json calendar-api:5001
+}

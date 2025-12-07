@@ -1,0 +1,97 @@
+# Multi-Service Docker Compose Configuration
+# This shows how to run all services (calendar, blog, strava) in separate containers
+#
+# Usage:
+#   docker-compose -f docker-compose.multi.yml up -d --build
+#
+# See ARCHITECTURE.md for details
+
+services:
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile
+      - caddy_data:/data
+      - caddy_config:/config
+    networks:
+      - backend
+
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-backend_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-changeme}
+      POSTGRES_DB: ${POSTGRES_DB:-backend_db}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - backend
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-backend_user}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  calendar-api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: ["uvicorn", "apps.calendar.main:app", "--host", "0.0.0.0", "--port", "5001"]
+    restart: unless-stopped
+    expose:
+      - "5001"
+    environment:
+      DATABASE_URL: postgresql+psycopg2://${POSTGRES_USER:-backend_user}:${POSTGRES_PASSWORD:-changeme}@db:5432/${POSTGRES_DB:-backend_db}
+      INTERNAL_API_KEY: ${INTERNAL_API_KEY}
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - backend
+
+  blog-api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: ["uvicorn", "apps.blog.main:app", "--host", "0.0.0.0", "--port", "5002"]
+    restart: unless-stopped
+    expose:
+      - "5002"
+    environment:
+      DATABASE_URL: postgresql+psycopg2://${POSTGRES_USER:-backend_user}:${POSTGRES_PASSWORD:-changeme}@db:5432/${POSTGRES_DB:-backend_db}
+      INTERNAL_API_KEY: ${INTERNAL_API_KEY}
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - backend
+
+  strava-api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: ["uvicorn", "apps.strava.main:app", "--host", "0.0.0.0", "--port", "5003"]
+    restart: unless-stopped
+    expose:
+      - "5003"
+    environment:
+      DATABASE_URL: postgresql+psycopg2://${POSTGRES_USER:-backend_user}:${POSTGRES_PASSWORD:-changeme}@db:5432/${POSTGRES_DB:-backend_db}
+      INTERNAL_API_KEY: ${INTERNAL_API_KEY}
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - backend
+
+networks:
+  backend:
+
+volumes:
+  caddy_data:
+  caddy_config:
+  postgres_data:

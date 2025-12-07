@@ -18,25 +18,46 @@ The project is fully portable — it can run on NREC, local Docker, or any cloud
 ```
 backend/
 ├── apps/
+│   ├── shared/
+│   │   ├── database.py          # Database connection & session management
+│   │   └── auth.py              # API key authentication middleware
 │   ├── calendar/
-│   │   └── main.py       # Calendar service API
+│   │   └── main.py              # Calendar service API
 │   ├── blog/
-│   │   └── main.py       # Blog service API (placeholder)
+│   │   └── main.py              # Blog service API (placeholder)
 │   └── strava/
-│       └── main.py       # Strava service API (placeholder)
-├── Caddyfile             # Reverse proxy configuration
-├── Dockerfile            # Container image definition
-├── docker-compose.yml    # Multi-container orchestration
-└── requirements.txt      # Python dependencies
+│       └── main.py              # Strava service API (placeholder)
+├── frontend-examples/            # Frontend integration examples
+│   ├── src/api/                 # TypeScript API client
+│   └── src/components/          # React component examples
+├── Caddyfile                    # Reverse proxy configuration (single service)
+├── Caddyfile.multi              # Reverse proxy for all services
+├── docker-compose.yml           # Single service orchestration
+├── docker-compose.multi.yml     # Multi-service orchestration
+├── Dockerfile                   # Container image definition
+├── requirements.txt             # Python dependencies
+├── .env.example                 # Environment variables template
+├── ARCHITECTURE.md              # Multi-service architecture guide
+├── SECURITY.md                  # Server security hardening guide
+└── API_KEY_USAGE.md             # API authentication guide
 ```
 
-## 📚 API Documentation
+## 📚 Documentation
+
+### API Documentation
 
 Live OpenAPI documentation is available at:
 
 - **Swagger UI**: [https://api.vuhnger.dev/docs](https://api.vuhnger.dev/docs)
 - **ReDoc**: [https://api.vuhnger.dev/redoc](https://api.vuhnger.dev/redoc)
 - **OpenAPI JSON**: [https://api.vuhnger.dev/openapi.json](https://api.vuhnger.dev/openapi.json)
+
+### Guides
+
+- **[ARCHITECTURE.md](ARCHITECTURE.md)** - Multi-service architecture design and scaling guide
+- **[SECURITY.md](SECURITY.md)** - Server security hardening (SSH, firewall, backups)
+- **[API_KEY_USAGE.md](API_KEY_USAGE.md)** - API authentication setup and usage
+- **[frontend-examples/](frontend-examples/)** - Frontend integration examples (React/TypeScript)
 
 ## 🛠 Requirements
 
