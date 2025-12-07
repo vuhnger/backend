@@ -489,6 +489,7 @@ nslookup api.vuhnger.dev
 # If frontends need a public path without exposing the API key, use the proxy:
 #   https://api.vuhnger.dev/julekalender-api/calendar/days/1
 # The key is injected by Caddy from INTERNAL_API_KEY (env in docker-compose).
+# Caddy enforces rate limits on /calendar/* and /julekalender-api/* (see Caddyfile).
 ```
 
 ### Out of Disk Space

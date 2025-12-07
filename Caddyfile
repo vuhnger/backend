@@ -5,10 +5,25 @@ api.vuhnger.dev {
     reverse_proxy /openapi.json calendar-api:5001
 
     # Calendar service (active)
-    reverse_proxy /calendar/* calendar-api:5001
+    handle_path /calendar/* {
+        rate_limit {
+            zone calendar_api
+            key {http.request.header.X-API-Key}
+            fallback_key {http.request.remote.host}
+            events 120
+            window 1m
+        }
+        reverse_proxy calendar-api:5001
+    }
 
     # Public proxy for julekalender frontend (injects API key from env)
     handle_path /julekalender-api/* {
+        rate_limit {
+            zone julekalender_api
+            key {http.request.remote.host}
+            events 120
+            window 1m
+        }
         header_up X-API-Key {env.INTERNAL_API_KEY}
         reverse_proxy calendar-api:5001
     }
