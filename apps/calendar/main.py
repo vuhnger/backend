@@ -9,6 +9,7 @@ import os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
 from shared.database import check_db_connection, get_db, engine, Base
+from shared.auth import get_api_key
 from .models import CalendarDay
 
 app = FastAPI(
@@ -54,10 +55,14 @@ def health():
 
 
 @router.get("/days", response_model=Dict[str, dict])
-def get_all_days(db: Session = Depends(get_db)):
+def get_all_days(
+    db: Session = Depends(get_db),
+    api_key: str = Depends(get_api_key)
+):
     """
     Get all advent calendar days
     Returns: Dictionary with day numbers as keys
+    Requires: X-API-Key header
     """
     days = db.query(CalendarDay).all()
 
@@ -70,7 +75,11 @@ def get_all_days(db: Session = Depends(get_db)):
 
 
 @router.get("/days/{day_number}")
-def get_day(day_number: int, db: Session = Depends(get_db)):
+def get_day(
+    day_number: int,
+    db: Session = Depends(get_db),
+    api_key: str = Depends(get_api_key)
+):
     """
     Get a specific advent calendar day
 
@@ -78,6 +87,7 @@ def get_day(day_number: int, db: Session = Depends(get_db)):
         day_number: Day number (1-24)
 
     Returns: Day data
+    Requires: X-API-Key header
     """
     if day_number < 1 or day_number > 24:
         raise HTTPException(status_code=400, detail="Day must be between 1 and 24")
@@ -91,11 +101,16 @@ def get_day(day_number: int, db: Session = Depends(get_db)):
 
 
 @router.post("/seed")
-def seed_calendar_data(calendar_data: Dict[str, dict], db: Session = Depends(get_db)):
+def seed_calendar_data(
+    calendar_data: Dict[str, dict],
+    db: Session = Depends(get_db),
+    api_key: str = Depends(get_api_key)
+):
     """
     Seed the database with calendar data
 
     Request body should be your JSON data with day numbers as keys
+    Requires: X-API-Key header
 
     Example:
     {

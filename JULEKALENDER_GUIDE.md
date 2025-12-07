@@ -23,10 +23,13 @@ Backenden kan nå lagre julekalenderdata i PostgreSQL-databasen og serve den til
 
 ## 🔌 API Endpoints
 
+**⚠️ Alle endepunkter krever autentisering med X-API-Key header (unntatt /health)**
+
 ### 1. Hent alle dager
 
 ```http
 GET /calendar/days
+X-API-Key: your_api_key_here
 ```
 
 **Response:**
@@ -38,10 +41,18 @@ GET /calendar/days
 }
 ```
 
+**401 Error hvis uautentisert:**
+```json
+{
+  "detail": "Invalid or missing API key"
+}
+```
+
 ### 2. Hent én spesifikk dag
 
 ```http
 GET /calendar/days/1
+X-API-Key: your_api_key_here
 ```
 
 **Response:**
@@ -54,16 +65,31 @@ GET /calendar/days/1
 }
 ```
 
+**401 Error hvis uautentisert:**
+```json
+{
+  "detail": "Invalid or missing API key"
+}
+```
+
 ### 3. Seed database med data (én gang)
 
 ```http
 POST /calendar/seed
 Content-Type: application/json
+X-API-Key: your_api_key_here
 
 {
   "1": { "type": "text", "title": "Julehilsen", "body": "..." },
   "2": { "type": "code", ... },
   ...
+}
+```
+
+**401 Error hvis uautentisert:**
+```json
+{
+  "detail": "Invalid or missing API key"
 }
 ```
 
@@ -85,6 +111,7 @@ docker-compose up -d --build
 ```bash
 curl -X POST http://localhost/calendar/seed \
   -H "Content-Type: application/json" \
+  -H "X-API-Key: your_api_key_here" \
   -d @path/to/your/calendar-data.json
 ```
 
@@ -120,10 +147,10 @@ print(response.json())
 
 ```bash
 # Hent alle dager
-curl http://localhost/calendar/days
+curl -H "X-API-Key: your_api_key_here" http://localhost/calendar/days
 
 # Hent dag 1
-curl http://localhost/calendar/days/1
+curl -H "X-API-Key: your_api_key_here" http://localhost/calendar/days/1
 ```
 
 ### Steg 4: Oppdater frontend
@@ -225,6 +252,7 @@ Hvis du trenger å endre data senere:
 ```bash
 curl -X POST http://localhost/calendar/seed \
   -H "Content-Type: application/json" \
+  -H "X-API-Key: your_api_key_here" \
   -d @calendar-data.json
 ```
 
@@ -260,32 +288,33 @@ curl -X POST https://api.vuhnger.dev/calendar/seed \
 
 ## 🔐 Sikkerhet
 
-### Beskytte seed endpoint (valgfritt)
+### API Key Autentisering
 
-Hvis du ikke vil at hvem som helst skal kunne overskrive kalenderdataen:
+**✅ Allerede implementert!** Alle endepunkter (unntatt `/health`) er beskyttet med API key autentisering.
 
-**Oppdater** `apps/calendar/main.py`:
+**Beskyttede endepunkter:**
+- `GET /calendar/days` - Les alle dager (krever API key)
+- `GET /calendar/days/{day_number}` - Les én dag (krever API key)
+- `POST /calendar/seed` - Skriv/oppdater data (krever API key)
 
-```python
-from shared.auth import get_api_key
+**Ubeskyttet endepunkt:**
+- `GET /calendar/health` - Health check (ingen API key nødvendig)
 
-@router.post("/seed")
-def seed_calendar_data(
-    calendar_data: Dict[str, dict],
-    db: Session = Depends(get_db),
-    api_key: str = Depends(get_api_key)  # Legg til denne
-):
-    # ... resten av koden
-```
-
-Nå krever seed endpoint API-nøkkel:
+**Slik bruker du API key:**
 
 ```bash
-curl -X POST https://api.vuhnger.dev/calendar/seed \
-  -H "Content-Type: application/json" \
-  -H "X-API-Key: your_secret_key" \
-  -d @calendar-data.json
+# Alle requests må inkludere X-API-Key header
+curl -H "X-API-Key: your_secret_key" https://api.vuhnger.dev/calendar/days
+
+# Uten API key får du 401 Unauthorized
+curl https://api.vuhnger.dev/calendar/days
+# {"detail": "Invalid or missing API key"}
 ```
+
+**Sette opp API key:**
+1. Generer sikker nøkkel: `python -c "import secrets; print(secrets.token_urlsafe(32))"`
+2. Legg til i `.env`: `INTERNAL_API_KEY=generated_key_here`
+3. Restart containere: `docker-compose restart`
 
 ---
 
@@ -326,21 +355,25 @@ SELECT day, type FROM calendar_days ORDER BY day;
 ### Test alle endpoints
 
 ```bash
-# Health check
+# Health check (ingen API key nødvendig)
 curl http://localhost/calendar/health
 
-# Hent alle dager
-curl http://localhost/calendar/days | jq
+# Hent alle dager (krever API key)
+curl -H "X-API-Key: your_api_key_here" http://localhost/calendar/days | jq
 
-# Hent dag 1
-curl http://localhost/calendar/days/1 | jq
+# Hent dag 1 (krever API key)
+curl -H "X-API-Key: your_api_key_here" http://localhost/calendar/days/1 | jq
 
-# Hent dag 25 (skal feile)
-curl http://localhost/calendar/days/25
+# Test uten API key (skal feile med 401)
+curl http://localhost/calendar/days
+# Response: {"detail": "Invalid or missing API key"}
+
+# Hent dag 25 (skal feile med 400)
+curl -H "X-API-Key: your_api_key_here" http://localhost/calendar/days/25
 # Response: {"detail": "Day must be between 1 and 24"}
 
-# Hent dag som ikke finnes (skal feile)
-curl http://localhost/calendar/days/15
+# Hent dag som ikke finnes (skal feile med 404)
+curl -H "X-API-Key: your_api_key_here" http://localhost/calendar/days/15
 # Response: {"detail": "Day 15 not found"}
 ```
 
