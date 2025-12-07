@@ -1,7 +1,7 @@
 from fastapi import FastAPI, APIRouter
 from fastapi.middleware.cors import CORSMiddleware
 
-app = FastAPI(title="Calendar Service", version="1.0.0")
+app = FastAPI(title="Strava Service", version="1.0.0")
 
 # CORS Configuration
 origins = [
@@ -19,18 +19,17 @@ app.add_middleware(
 )
 
 # Router setup
-router = APIRouter(prefix="/calendar")
+router = APIRouter(prefix="/strava")
 
 @router.get("/health")
 def health():
     """Health check endpoint - returns service status"""
-    return {"status": "ok", "service": "calendar"}
+    return {"status": "ok", "service": "strava"}
 
-# Future calendar endpoints will be added here
+# Future strava endpoints will be added here
 # Example structure:
-# @router.get("/events")
-# @router.post("/events")
-# @router.get("/events/{event_id}")
+# @router.get("/activities")
+# @router.get("/stats")
 # etc.
 
 app.include_router(router)
