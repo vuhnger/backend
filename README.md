@@ -2,7 +2,7 @@
 
 A lightweight backend built with **FastAPI** and **Docker**, designed to run multiple small services (e.g., calendar, blog, Strava tracking).  
 The project is fully portable — it can run on NREC, local Docker, or any cloud provider that supports containers.
-
+e
 ## 🚀 Features
 
 - FastAPI application  
