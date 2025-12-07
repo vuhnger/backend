@@ -1,9 +1,13 @@
-from fastapi import FastAPI, APIRouter, Depends, HTTPException
-from fastapi.middleware.cors import CORSMiddleware
-from sqlalchemy.orm import Session
-from typing import Dict, List
-import sys
+import logging
 import os
+import sys
+from typing import Dict
+
+from fastapi import FastAPI, APIRouter, Depends, HTTPException, Request, status
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.orm import Session
 
 # Add parent directory to path to import shared modules
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
@@ -11,6 +15,9 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 from shared.database import check_db_connection, get_db, engine, Base
 from shared.auth import get_api_key
 from .models import CalendarDay
+
+logger = logging.getLogger("calendar-service")
+logging.basicConfig(level=logging.INFO)
 
 app = FastAPI(
     title="Calendar Service",
@@ -38,6 +45,61 @@ app.add_middleware(
 
 # Create database tables
 Base.metadata.create_all(bind=engine)
+
+def error_response(message: str, category: str, status_code: int) -> JSONResponse:
+    """Consistent error payloads across the API."""
+    return JSONResponse(
+        status_code=status_code,
+        content={
+            "error": message,
+            "category": category,
+        },
+    )
+
+
+@app.exception_handler(SQLAlchemyError)
+async def database_exception_handler(request: Request, exc: SQLAlchemyError):
+    logger.exception("Database error on %s", request.url.path)
+    return error_response(
+        message="A database error occurred while processing the request.",
+        category="database",
+        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+    )
+
+
+@app.exception_handler(HTTPException)
+async def http_exception_handler(request: Request, exc: HTTPException):
+    detail = exc.detail
+    message = (
+        detail.get("message") if isinstance(detail, dict) else str(detail)
+    ) or "Request failed."
+    category = (
+        detail.get("category") if isinstance(detail, dict) else None
+    )
+
+    if not category:
+        if exc.status_code in (status.HTTP_401_UNAUTHORIZED, status.HTTP_403_FORBIDDEN):
+            category = "security"
+        elif exc.status_code >= 500:
+            category = "server_error"
+        else:
+            category = "client_error"
+
+    return error_response(
+        message=message,
+        category=category,
+        status_code=exc.status_code,
+    )
+
+
+@app.exception_handler(Exception)
+async def unexpected_exception_handler(request: Request, exc: Exception):
+    logger.exception("Unexpected error on %s", request.url.path, exc_info=exc)
+    return error_response(
+        message="An unexpected server error occurred. Please try again later.",
+        category="server_error",
+        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+    )
 
 # Router setup
 router = APIRouter(prefix="/calendar")
