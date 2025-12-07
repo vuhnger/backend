@@ -7,11 +7,14 @@ The project is fully portable — it can run on NREC, local Docker, or any cloud
 
 - **FastAPI** with automatic OpenAPI documentation
 - **Fully containerized** with Docker (Caddy + services)
-- **Modular architecture** (`apps/<service>/main.py`)
+- **PostgreSQL** database with persistent storage
 - **Caddy** reverse proxy with automatic HTTPS
+- **API key authentication** middleware
 - **CORS** configured for production and development
 - **Isolated Docker network** for inter-service communication
-- Easy to extend with new services  
+- **Multi-service architecture** ready for scaling
+
+---
 
 ## 📦 Repository Structure
 
@@ -42,6 +45,8 @@ backend/
 └── API_KEY_USAGE.md             # API authentication guide
 ```
 
+---
+
 ## 📚 Documentation
 
 ### API Documentation
@@ -59,119 +64,159 @@ Live OpenAPI documentation is available at:
 - **[API_KEY_USAGE.md](API_KEY_USAGE.md)** - API authentication setup and usage
 - **[frontend-examples/](frontend-examples/)** - Frontend integration examples (React/TypeScript)
 
-## 🛠 Requirements
+---
 
-You need **Docker** and **Docker Compose**.
+## 🛠 Initial Setup (First Time)
 
-### On macOS  
-Docker Desktop includes everything:  
-https://www.docker.com/products/docker-desktop/
+### Prerequisites
 
-### On Linux  
-Install Docker + the Compose plugin using your package manager.
+**On Your Local Machine:**
+- Git installed
+- SSH key configured for GitHub
 
-## ▶️ Running the Backend
+**On Your Server (DigitalOcean):**
+- Ubuntu 22.04+ droplet running
+- Domain `api.vuhnger.dev` pointing to droplet IP
+- Docker and Docker Compose installed
+- SSH access configured
 
-### Local Development
+### Step 1: Clone Repository
 
-Clone the repo:
+**On the server:**
 
 ```bash
+cd ~
 git clone https://github.com/vuhnger/backend.git
 cd backend
 ```
 
-Start all services (Caddy + backend):
+### Step 2: Configure Environment Variables
 
 ```bash
+# Copy template
+cp .env.example .env
+
+# Edit with your values
+nano .env
+```
+
+**Required configuration in `.env`:**
+
+```env
+# Database Configuration
+POSTGRES_USER=backend_user
+POSTGRES_PASSWORD=CHANGE_THIS_TO_SECURE_PASSWORD
+POSTGRES_DB=backend_db
+
+# API Security
+# Generate with: python -c "import secrets; print(secrets.token_urlsafe(32))"
+INTERNAL_API_KEY=CHANGE_THIS_TO_RANDOM_KEY
+```
+
+**Generate secure values:**
+
+```bash
+# Generate secure password for database
+python3 -c "import secrets; print(secrets.token_urlsafe(32))"
+
+# Generate API key
+python3 -c "import secrets; print(secrets.token_urlsafe(32))"
+```
+
+Copy the generated values into your `.env` file.
+
+### Step 3: Stop Existing Caddy (if running on host)
+
+```bash
+# Check if Caddy is running
+sudo systemctl status caddy
+
+# If running, stop and disable it
+sudo systemctl stop caddy
+sudo systemctl disable caddy
+```
+
+### Step 4: Start the Backend
+
+```bash
+# Build and start all services
 docker-compose up -d --build
-```
 
-Check that it works:
+# Check status
+docker-compose ps
 
-```bash
-curl http://localhost/calendar/health
-```
-
-Expected output:
-
-```json
-{"status": "ok", "service": "calendar"}
-```
-
-View logs:
-
-```bash
+# View logs
 docker-compose logs -f
 ```
 
-Stop all services:
+**Expected output:**
+
+```
+NAME                COMMAND                  SERVICE       STATUS
+backend-caddy-1     "caddy run --config …"   caddy         Up
+backend-calendar-1  "uvicorn apps.calen…"    calendar-api  Up (healthy)
+backend-db-1        "docker-entrypoint.s…"   db            Up (healthy)
+```
+
+### Step 5: Test the Deployment
 
 ```bash
-docker-compose down
+# Test health endpoint
+curl https://api.vuhnger.dev/calendar/health
+
+# Expected output:
+# {"status":"ok","service":"calendar","database":"connected"}
+
+# Test API documentation
+curl https://api.vuhnger.dev/docs
+# Should return HTML
 ```
 
-### Architecture
+### Step 6: Configure Security
 
-The setup includes:
-- **Caddy** (ports 80/443): Reverse proxy with automatic HTTPS
-- **calendar-api** (internal port 5001): FastAPI service
-- **backend network**: Isolated Docker network for inter-service communication
+Follow the [SECURITY.md](SECURITY.md) guide to:
 
-Services communicate via Docker service names (`calendar-api:5001`), not localhost.
+1. **SSH Hardening:**
+   - Disable password authentication
+   - Configure key-only access
 
-## 🧱 Adding New Services
+2. **Firewall Setup:**
+   - Create DigitalOcean firewall
+   - Allow SSH from your home IP only
+   - Allow HTTP/HTTPS from everywhere
 
-To add another microservice:
+3. **Backups:**
+   - Enable DigitalOcean droplet backups
+   - Configure database backups
 
-1. Create a folder such as:
+### Step 7: Configure Frontend (Optional)
+
+If you have a frontend application:
+
+1. Copy example files from `frontend-examples/` to your frontend repo
+2. Create `.env` in your frontend:
+
+```env
+VITE_API_BASE_URL=https://api.vuhnger.dev
+VITE_API_KEY=your_api_key_from_backend_env
 ```
-apps/blog/main.py
-```
-2. Implement FastAPI routes there.  
-3. Update `Caddyfile` if you want it exposed publicly.  
-4. Rebuild:
+
+3. See [frontend-examples/README.md](frontend-examples/README.md) for integration instructions
+
+---
+
+## 🔄 Common Operations
+
+### Deploy Code Updates
 
 ```bash
-docker compose up -d --build
-```
-
-## 🌍 Deployment
-
-### DigitalOcean / NREC
-
-**Initial setup** (if migrating from host-based Caddy):
-
-```bash
-# Stop any existing Caddy service on the host
-sudo systemctl stop caddy
-sudo systemctl disable caddy
-
-# Pull the repo
+# On the server
+cd ~/backend
 git pull
-
-# Start containerized stack
 docker-compose up -d --build
 ```
 
-**Deploy updates**:
-
-```bash
-git pull
-docker-compose up -d --build
-```
-
-**Restart individual services**:
-
-```bash
-# Restart just the calendar service
-docker-compose restart calendar-api
-
-# Restart just Caddy
-docker-compose restart caddy
-```
-
-**View logs**:
+### View Logs
 
 ```bash
 # All services
@@ -179,11 +224,347 @@ docker-compose logs -f
 
 # Specific service
 docker-compose logs -f calendar-api
+
+# Last 100 lines
+docker-compose logs --tail=100 calendar-api
 ```
 
-### Other Platforms
+### Restart Services
 
-This backend is portable to any Docker-friendly platform (Fly.io, Railway, Vultr, DigitalOcean, etc).
+```bash
+# Restart all services
+docker-compose restart
 
-The containerized Caddy setup works anywhere Docker runs. SSL certificates are persisted in Docker volumes.
+# Restart specific service
+docker-compose restart calendar-api
 
+# Restart just Caddy (for config changes)
+docker-compose restart caddy
+```
+
+### Database Operations
+
+```bash
+# Access PostgreSQL shell
+docker-compose exec db psql -U backend_user -d backend_db
+
+# Create database backup
+docker-compose exec db pg_dump -U backend_user backend_db > backup_$(date +%Y%m%d).sql
+
+# Restore from backup
+cat backup_20251207.sql | docker-compose exec -T db psql -U backend_user -d backend_db
+```
+
+### Monitor Resource Usage
+
+```bash
+# Container stats
+docker stats
+
+# Disk usage
+docker system df
+
+# Clean up unused images/containers
+docker system prune -a
+```
+
+### Stop All Services
+
+```bash
+# Stop but keep data
+docker-compose down
+
+# Stop and remove all data (CAREFUL!)
+docker-compose down -v
+```
+
+---
+
+## 🏗️ Architecture
+
+### Current Setup (Single Service)
+
+```
+Internet (HTTPS)
+    ↓
+Caddy (ports 80/443)
+    ↓
+calendar-api (port 5001) → PostgreSQL (port 5432)
+```
+
+### Components
+
+| Component | Description | Exposed Ports |
+|-----------|-------------|---------------|
+| **caddy** | Reverse proxy with automatic HTTPS | 80, 443 |
+| **calendar-api** | FastAPI service for calendar endpoints | None (internal) |
+| **db** | PostgreSQL 16 database | None (internal) |
+
+### Networking
+
+- All services communicate via Docker network `backend`
+- Only Caddy is exposed to the internet
+- Services use Docker service names (e.g., `calendar-api:5001`, `db:5432`)
+- SSL certificates managed automatically by Caddy
+
+### Data Persistence
+
+Volumes persist data across container restarts:
+
+- `caddy_data` - SSL certificates
+- `caddy_config` - Caddy configuration
+- `postgres_data` - Database files
+
+---
+
+## 🚀 Scaling to Multiple Services
+
+When ready to add more services (blog, strava):
+
+### 1. Switch to Multi-Service Configuration
+
+```bash
+# Use the multi-service docker-compose
+docker-compose -f docker-compose.multi.yml up -d --build
+
+# Update Caddyfile
+cp Caddyfile.multi Caddyfile
+docker-compose restart caddy
+```
+
+### 2. Access Different Services
+
+- Calendar: `https://api.vuhnger.dev/calendar/*`
+- Blog: `https://api.vuhnger.dev/blog/*`
+- Strava: `https://api.vuhnger.dev/strava/*`
+
+See [ARCHITECTURE.md](ARCHITECTURE.md) for complete multi-service guide.
+
+---
+
+## 🧪 Local Development
+
+### Running Locally
+
+```bash
+# Clone repo
+git clone https://github.com/vuhnger/backend.git
+cd backend
+
+# Create .env (optional for local)
+cp .env.example .env
+
+# Start services
+docker-compose up -d --build
+
+# Access locally
+curl http://localhost/calendar/health
+
+# View docs
+open http://localhost/docs
+```
+
+### Development Workflow
+
+1. Make code changes
+2. Rebuild: `docker-compose up -d --build`
+3. Check logs: `docker-compose logs -f`
+4. Test: `curl http://localhost/calendar/health`
+5. Commit and push
+
+---
+
+## 🔐 Security
+
+### Current Security Features
+
+✅ **HTTPS** - Automatic via Caddy
+✅ **API Key Authentication** - Optional middleware
+✅ **CORS** - Configured for allowed origins
+✅ **Isolated Network** - Services not exposed directly
+✅ **Health Checks** - Database connection monitoring
+
+### Recommended Security Steps
+
+See [SECURITY.md](SECURITY.md) for:
+
+- SSH hardening (key-only access)
+- Firewall configuration (DigitalOcean)
+- Automatic security updates
+- Database backups
+- Monitoring and logging
+
+---
+
+## 📝 Environment Variables Reference
+
+| Variable | Description | Example | Required |
+|----------|-------------|---------|----------|
+| `POSTGRES_USER` | Database username | `backend_user` | Yes |
+| `POSTGRES_PASSWORD` | Database password | `secure_random_password` | Yes |
+| `POSTGRES_DB` | Database name | `backend_db` | Yes |
+| `INTERNAL_API_KEY` | API authentication key | `random_api_key` | Optional |
+
+**Security Note:** Never commit `.env` files to Git. Always use `.env.example` as a template.
+
+---
+
+## 🔧 Troubleshooting
+
+### Services Won't Start
+
+```bash
+# Check status
+docker-compose ps
+
+# View logs
+docker-compose logs
+
+# Rebuild from scratch
+docker-compose down -v
+docker-compose up -d --build
+```
+
+### Database Connection Issues
+
+```bash
+# Check database is healthy
+docker-compose ps db
+
+# Access database directly
+docker-compose exec db psql -U backend_user -d backend_db
+
+# Check connection from calendar-api
+docker-compose exec calendar-api python -c "from apps.shared.database import check_db_connection; print(check_db_connection())"
+```
+
+### Caddy SSL Issues
+
+```bash
+# Check Caddy logs
+docker-compose logs caddy
+
+# Verify domain DNS
+dig api.vuhnger.dev
+
+# Restart Caddy
+docker-compose restart caddy
+```
+
+### API Not Accessible
+
+```bash
+# Check firewall allows ports 80/443
+sudo ufw status
+
+# Check Caddy is running
+docker-compose ps caddy
+
+# Test from server
+curl http://localhost/calendar/health
+
+# Check DNS
+nslookup api.vuhnger.dev
+```
+
+### Out of Disk Space
+
+```bash
+# Check usage
+df -h
+
+# Clean Docker
+docker system prune -a
+
+# Remove old images
+docker image prune -a
+```
+
+---
+
+## 📊 Monitoring
+
+### Health Endpoints
+
+- Calendar: `https://api.vuhnger.dev/calendar/health`
+- Returns: `{"status":"ok","service":"calendar","database":"connected"}`
+
+### Check Service Status
+
+```bash
+# Container status
+docker-compose ps
+
+# Resource usage
+docker stats
+
+# Logs
+docker-compose logs --tail=50
+```
+
+### Set Up Monitoring (Optional)
+
+Consider adding:
+- **Uptime monitoring** - UptimeRobot, Healthchecks.io
+- **Error tracking** - Sentry
+- **Logging** - Papertrail, Loggly
+- **Metrics** - Prometheus + Grafana
+
+---
+
+## 🔗 Useful Commands Cheatsheet
+
+```bash
+# === Deployment ===
+git pull && docker-compose up -d --build    # Deploy updates
+docker-compose restart calendar-api         # Restart service
+docker-compose logs -f calendar-api         # View logs
+
+# === Database ===
+docker-compose exec db psql -U backend_user -d backend_db  # DB shell
+docker-compose exec db pg_dump -U backend_user backend_db > backup.sql  # Backup
+
+# === Monitoring ===
+docker-compose ps                           # Service status
+docker stats                                # Resource usage
+docker-compose logs --tail=100 -f          # Recent logs
+
+# === Maintenance ===
+docker-compose down                         # Stop all
+docker system prune -a                      # Clean up
+docker-compose up -d --build                # Rebuild all
+```
+
+---
+
+## 🎯 Next Steps
+
+- [ ] Complete initial deployment following setup steps
+- [ ] Configure security (SSH, firewall, backups)
+- [ ] Test health endpoint: `https://api.vuhnger.dev/calendar/health`
+- [ ] Test API docs: `https://api.vuhnger.dev/docs`
+- [ ] Implement calendar business logic (when ready)
+- [ ] Add blog service (when ready)
+- [ ] Add strava service (when ready)
+- [ ] Set up monitoring and alerts
+
+---
+
+## 📞 Support
+
+**Documentation:**
+- [ARCHITECTURE.md](ARCHITECTURE.md) - Multi-service design
+- [SECURITY.md](SECURITY.md) - Security hardening
+- [API_KEY_USAGE.md](API_KEY_USAGE.md) - Authentication
+
+**Resources:**
+- [FastAPI Docs](https://fastapi.tiangolo.com/)
+- [Docker Compose Docs](https://docs.docker.com/compose/)
+- [Caddy Docs](https://caddyserver.com/docs/)
+- [DigitalOcean Docs](https://docs.digitalocean.com/)
+
+---
+
+**Last updated:** 2025-12-07
+**Domain:** api.vuhnger.dev
+**Repository:** https://github.com/vuhnger/backend
