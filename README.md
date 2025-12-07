@@ -420,6 +420,13 @@ docker-compose ps
 # View logs
 docker-compose logs
 
+# If Caddy is missing, ensure ports 80/443 are free (stop host caddy/nginx)
+sudo systemctl status caddy
+
+# Start just Caddy and watch for bind errors
+docker-compose up -d caddy
+docker-compose logs --tail=50 caddy
+
 # Rebuild from scratch
 docker-compose down -v
 docker-compose up -d --build
@@ -436,6 +443,18 @@ docker-compose exec db psql -U backend_user -d backend_db
 
 # Check connection from calendar-api
 docker-compose exec calendar-api python -c "from apps.shared.database import check_db_connection; print(check_db_connection())"
+
+# If tables are missing, create them from inside the app container
+docker-compose exec -T calendar-api python - <<'PY'
+from apps.shared.database import Base, engine
+from apps.calendar.models import CalendarDay
+from sqlalchemy import inspect
+Base.metadata.create_all(engine)
+print("tables:", inspect(engine).get_table_names())
+PY
+
+# Verify tables in Postgres
+docker-compose exec db psql -U backend_user -d backend_db -c "\dt"
 ```
 
 ### Caddy SSL Issues
@@ -459,6 +478,7 @@ sudo ufw status
 
 # Check Caddy is running
 docker-compose ps caddy
+docker-compose logs --tail=50 caddy
 
 # Test from server
 curl http://localhost/calendar/health
@@ -523,6 +543,12 @@ docker-compose logs -f calendar-api         # View logs
 # === Database ===
 docker-compose exec db psql -U backend_user -d backend_db  # DB shell
 docker-compose exec db pg_dump -U backend_user backend_db > backup.sql  # Backup
+docker-compose exec -T calendar-api python - <<'PY'        # Create tables from app container
+from apps.shared.database import Base, engine
+from apps.calendar.models import CalendarDay
+Base.metadata.create_all(engine)
+print("tables created")
+PY
 
 # === Monitoring ===
 docker-compose ps                           # Service status
@@ -533,6 +559,35 @@ docker-compose logs --tail=100 -f          # Recent logs
 docker-compose down                         # Stop all
 docker system prune -a                      # Clean up
 docker-compose up -d --build                # Rebuild all
+
+# === Seeding (if curl not installed in app container) ===
+docker-compose exec -T calendar-api python - <<'PY'
+import json
+from apps.shared.database import SessionLocal, Base, engine
+from apps.calendar.models import CalendarDay
+from sqlalchemy import inspect
+
+Base.metadata.create_all(engine)
+with open("/app/calendar-data.json") as f:
+    payload = json.load(f)
+
+db = SessionLocal()
+count = 0
+for day_str, day_data in payload.items():
+    day_number = int(day_str)
+    day_type = day_data["type"]
+    data = {k: v for k, v in day_data.items() if k != "type"}
+    existing = db.query(CalendarDay).filter_by(day=day_number).first()
+    if existing:
+        existing.type = day_type
+        existing.data = data
+    else:
+        db.add(CalendarDay(day=day_number, type=day_type, data=data))
+    count += 1
+db.commit()
+db.close()
+print(f"Seeded {count} days; tables: {inspect(engine).get_table_names()}")
+PY
 ```
 
 ---
