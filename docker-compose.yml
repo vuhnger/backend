@@ -1,0 +1,6 @@
+services:
+  calendar-api:
+    build: .
+    restart: unless-stopped
+    ports:
+      - "5001:5001"
