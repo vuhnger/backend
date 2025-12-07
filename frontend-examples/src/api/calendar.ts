@@ -6,6 +6,23 @@
 import type { HealthResponse } from './types';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
+const API_KEY = import.meta.env.VITE_API_KEY;
+
+/**
+ * Get default headers for API requests
+ * Includes API key if configured
+ */
+function getHeaders(): HeadersInit {
+  const headers: HeadersInit = {
+    'Content-Type': 'application/json',
+  };
+
+  if (API_KEY) {
+    headers['X-API-Key'] = API_KEY;
+  }
+
+  return headers;
+}
 
 /**
  * Health check endpoint
@@ -14,9 +31,7 @@ const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
 export async function getHealth(): Promise<HealthResponse> {
   const response = await fetch(`${API_BASE_URL}/calendar/health`, {
     method: 'GET',
-    headers: {
-      'Content-Type': 'application/json',
-    },
+    headers: getHeaders(),
   });
 
   if (!response.ok) {
@@ -32,9 +47,7 @@ export async function getHealth(): Promise<HealthResponse> {
 // export async function getEvents(): Promise<Event[]> {
 //   const response = await fetch(`${API_BASE_URL}/calendar/events`, {
 //     method: 'GET',
-//     headers: {
-//       'Content-Type': 'application/json',
-//     },
+//     headers: getHeaders(),  // Use getHeaders() for API key
 //   });
 //
 //   if (!response.ok) {
