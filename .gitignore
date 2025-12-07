@@ -14,6 +14,9 @@
 backup_*.sql
 backups/
 
+# Calendar data (personal)
+calendar-data.json
+
 # SSL certificates and keys
 *.pem
 *.key
