@@ -6,7 +6,7 @@ Checks for X-API-Key header and validates against environment variable.
 """
 
 import os
-from fastapi import Request, HTTPException, status
+from fastapi import Request, HTTPException, status, Depends
 from fastapi.security import APIKeyHeader
 from starlette.middleware.base import BaseHTTPMiddleware
 
@@ -20,7 +20,7 @@ INTERNAL_API_KEY = os.getenv("INTERNAL_API_KEY")
 api_key_header = APIKeyHeader(name=API_KEY_HEADER, auto_error=False)
 
 
-async def get_api_key(api_key: str = api_key_header) -> str:
+async def get_api_key(api_key: str = Depends(api_key_header)) -> str:
     """
     Dependency to validate API key from header
 
@@ -68,7 +68,7 @@ class APIKeyMiddleware(BaseHTTPMiddleware):
         api_key = request.headers.get(API_KEY_HEADER)
 
         if api_key != INTERNAL_API_KEY:
-            return HTTPException(
+            raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Invalid or missing API key"
             )
