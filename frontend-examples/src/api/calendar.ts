@@ -41,18 +41,37 @@ export async function getHealth(): Promise<HealthResponse> {
   return response.json();
 }
 
-// Future calendar endpoints will be added here
-// Example structure (DO NOT IMPLEMENT YET):
-//
-// export async function getEvents(): Promise<Event[]> {
-//   const response = await fetch(`${API_BASE_URL}/calendar/events`, {
-//     method: 'GET',
-//     headers: getHeaders(),  // Use getHeaders() for API key
-//   });
-//
-//   if (!response.ok) {
-//     throw new Error(`Failed to fetch events: ${response.statusText}`);
-//   }
-//
-//   return response.json();
-// }
+/**
+ * Get all calendar days
+ * @returns Dictionary with day numbers as keys
+ */
+export async function getCalendarDays(): Promise<Record<string, any>> {
+  const response = await fetch(`${API_BASE_URL}/calendar/days`, {
+    method: 'GET',
+    headers: getHeaders(),
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to fetch calendar days: ${response.statusText}`);
+  }
+
+  return response.json();
+}
+
+/**
+ * Get a specific calendar day
+ * @param dayNumber Day number (1-24)
+ * @returns Day data
+ */
+export async function getCalendarDay(dayNumber: number): Promise<any> {
+  const response = await fetch(`${API_BASE_URL}/calendar/days/${dayNumber}`, {
+    method: 'GET',
+    headers: getHeaders(),
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to fetch day ${dayNumber}: ${response.statusText}`);
+  }
+
+  return response.json();
+}
