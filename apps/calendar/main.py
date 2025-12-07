@@ -9,7 +9,7 @@ import os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
 from shared.database import check_db_connection, get_db, engine, Base
-from calendar.models import CalendarDay
+from .models import CalendarDay
 
 app = FastAPI(
     title="Calendar Service",
