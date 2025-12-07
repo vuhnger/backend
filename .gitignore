@@ -1,1 +1,115 @@
+# ===================================
+# Sensitive Data - NEVER COMMIT THESE
+# ===================================
+
+# Environment variables with secrets
+.env
+.env.*
+!.env.example
+
+# Database dumps and backups
+*.sql
+*.sql.gz
+*.dump
+backup_*.sql
+backups/
+
+# SSL certificates and keys
+*.pem
+*.key
+*.crt
+*.cert
+
+# ===================================
+# Python
+# ===================================
+
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Distribution / packaging
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual environments
+venv/
+ENV/
+env/
+.venv
+
+# PyCharm
+.idea/
+
+# VS Code
+.vscode/
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+
+# ===================================
+# Docker
+# ===================================
+
+# Docker volumes data (should be in volumes, but just in case)
+postgres_data/
+caddy_data/
+caddy_config/
+
+# ===================================
+# Logs
+# ===================================
+
+*.log
+logs/
+*.out
+
+# ===================================
+# OS Files
+# ===================================
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Linux
+*~
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# ===================================
+# Claude Code
+# ===================================
+
 .claude
+
+# ===================================
+# Temporary Files
+# ===================================
+
+*.tmp
+*.temp
+*.swp
+*.swo
+*~
