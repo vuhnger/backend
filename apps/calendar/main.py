@@ -1,7 +1,14 @@
 from fastapi import FastAPI, APIRouter
 from fastapi.middleware.cors import CORSMiddleware
 
-app = FastAPI(title="Calendar Service", version="1.0.0")
+app = FastAPI(
+    title="Calendar Service",
+    version="1.0.0",
+    description="API for managing calendar events and scheduling",
+    docs_url="/docs",
+    redoc_url="/redoc",
+    openapi_url="/openapi.json",
+)
 
 # CORS Configuration
 origins = [

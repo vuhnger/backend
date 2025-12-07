@@ -1,0 +1,15 @@
+api.vuhnger.dev {
+    # API Documentation (currently shows calendar service)
+    reverse_proxy /docs calendar-api:5001
+    reverse_proxy /redoc calendar-api:5001
+    reverse_proxy /openapi.json calendar-api:5001
+
+    # Calendar service (active)
+    reverse_proxy /calendar/* calendar-api:5001
+
+    # Blog service (coming in STEP 6)
+    # reverse_proxy /blog/* blog-api:5002
+
+    # Strava service (coming in STEP 6)
+    # reverse_proxy /strava/* strava-api:5003
+}
