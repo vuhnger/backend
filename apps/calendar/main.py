@@ -1,5 +1,12 @@
 from fastapi import FastAPI, APIRouter
 from fastapi.middleware.cors import CORSMiddleware
+import sys
+import os
+
+# Add parent directory to path to import shared modules
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+
+from shared.database import check_db_connection
 
 app = FastAPI(
     title="Calendar Service",
@@ -30,8 +37,14 @@ router = APIRouter(prefix="/calendar")
 
 @router.get("/health")
 def health():
-    """Health check endpoint - returns service status"""
-    return {"status": "ok", "service": "calendar"}
+    """Health check endpoint - returns service status and database connectivity"""
+    db_connected = check_db_connection()
+
+    return {
+        "status": "ok" if db_connected else "degraded",
+        "service": "calendar",
+        "database": "connected" if db_connected else "disconnected"
+    }
 
 # Future calendar endpoints will be added here
 # Example structure:
