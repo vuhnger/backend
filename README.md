@@ -485,6 +485,10 @@ curl http://localhost/calendar/health
 
 # Check DNS
 nslookup api.vuhnger.dev
+
+# If frontends need a public path without exposing the API key, use the proxy:
+#   https://api.vuhnger.dev/julekalender-api/calendar/days/1
+# The key is injected by Caddy from INTERNAL_API_KEY (env in docker-compose).
 ```
 
 ### Out of Disk Space
@@ -588,6 +592,10 @@ db.commit()
 db.close()
 print(f"Seeded {count} days; tables: {inspect(engine).get_table_names()}")
 PY
+
+# === Frontend without exposing API key ===
+# Call through Caddy proxy; it injects X-API-Key from INTERNAL_API_KEY:
+#   https://api.vuhnger.dev/julekalender-api/calendar/days/1
 ```
 
 ---

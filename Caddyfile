@@ -7,6 +7,12 @@ api.vuhnger.dev {
     # Calendar service (active)
     reverse_proxy /calendar/* calendar-api:5001
 
+    # Public proxy for julekalender frontend (injects API key from env)
+    handle_path /julekalender-api/* {
+        header_up X-API-Key {env.INTERNAL_API_KEY}
+        reverse_proxy calendar-api:5001
+    }
+
     # Blog service (coming in STEP 6)
     # reverse_proxy /blog/* blog-api:5002
 
