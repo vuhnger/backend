@@ -1,7 +1,30 @@
-from fastapi import FastAPI, APIRouter
-from fastapi.middleware.cors import CORSMiddleware
+"""
+Strava Service API
 
-app = FastAPI(title="Strava Service", version="1.0.0")
+OAuth integration for Strava with cached statistics.
+Single user mode - stores one set of tokens and serves cached data.
+"""
+import os
+import secrets
+from fastapi import FastAPI, APIRouter, Depends, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import RedirectResponse
+from sqlalchemy.orm import Session
+from stravalib.client import Client
+
+from apps.shared.database import get_db, Base, engine, check_db_connection
+from apps.shared.auth import get_api_key
+from apps.strava.models import StravaAuth, StravaStats
+from apps.strava.tasks import fetch_and_cache_stats
+
+# Create database tables
+Base.metadata.create_all(bind=engine)
+
+app = FastAPI(
+    title="Strava Service",
+    version="1.0.0",
+    description="Strava OAuth integration with cached activity statistics"
+)
 
 # CORS Configuration
 origins = [
@@ -21,15 +44,165 @@ app.add_middleware(
 # Router setup
 router = APIRouter(prefix="/strava")
 
+# OAuth state for CSRF protection
+oauth_state = secrets.token_urlsafe(32)
+
+
 @router.get("/health")
 def health():
-    """Health check endpoint - returns service status"""
-    return {"status": "ok", "service": "strava"}
+    """Health check endpoint"""
+    db_connected = check_db_connection()
+    return {
+        "status": "ok" if db_connected else "degraded",
+        "service": "strava",
+        "database": "connected" if db_connected else "disconnected"
+    }
 
-# Future strava endpoints will be added here
-# Example structure:
-# @router.get("/activities")
-# @router.get("/stats")
-# etc.
+
+@router.get("/authorize")
+def authorize():
+    """
+    Initiate OAuth flow by redirecting to Strava.
+    User will be redirected to Strava to authorize the app.
+    """
+    client_id = os.getenv("STRAVA_CLIENT_ID")
+    redirect_uri = os.getenv("STRAVA_REDIRECT_URI")
+    
+    if not client_id or not redirect_uri:
+        raise HTTPException(status_code=500, detail="Strava OAuth not configured")
+    
+    # Build authorization URL
+    authorize_url = f"https://www.strava.com/oauth/authorize?client_id={client_id}&redirect_uri={redirect_uri}&response_type=code&scope=read,activity:read_all&state={oauth_state}"
+    
+    return RedirectResponse(url=authorize_url)
+
+
+@router.get("/callback")
+def oauth_callback(code: str, state: str, db: Session = Depends(get_db)):
+    """
+    OAuth callback endpoint.
+    Strava redirects here after user authorizes.
+    Exchanges code for tokens and stores in database.
+    """
+    # Verify state for CSRF protection
+    if state \!= oauth_state:
+        raise HTTPException(status_code=400, detail="Invalid state parameter")
+    
+    client_id = os.getenv("STRAVA_CLIENT_ID")
+    client_secret = os.getenv("STRAVA_CLIENT_SECRET")
+    
+    if not client_id or not client_secret:
+        raise HTTPException(status_code=500, detail="Strava OAuth not configured")
+    
+    # Exchange code for tokens
+    client = Client()
+    token_response = client.exchange_code_for_token(
+        client_id=client_id,
+        client_secret=client_secret,
+        code=code
+    )
+    
+    # Extract token data
+    access_token = token_response["access_token"]
+    refresh_token = token_response["refresh_token"]
+    expires_at = token_response["expires_at"]
+    athlete_id = token_response["athlete"]["id"]
+    
+    # Store in database (single user, id=1)
+    existing_auth = db.query(StravaAuth).filter(StravaAuth.id == 1).first()
+    
+    if existing_auth:
+        # Update existing
+        existing_auth.athlete_id = athlete_id
+        existing_auth.access_token = access_token
+        existing_auth.refresh_token = refresh_token
+        existing_auth.expires_at = expires_at
+    else:
+        # Create new
+        auth = StravaAuth(
+            id=1,
+            athlete_id=athlete_id,
+            access_token=access_token,
+            refresh_token=refresh_token,
+            expires_at=expires_at
+        )
+        db.add(auth)
+    
+    db.commit()
+    
+    # Trigger initial data fetch (async would be better, but simple sync for now)
+    try:
+        fetch_and_cache_stats()
+    except Exception as e:
+        print(f"Initial data fetch failed: {e}")
+    
+    # Redirect to frontend success page
+    frontend_url = os.getenv("FRONTEND_URL", "https://vuhnger.dev")
+    return RedirectResponse(url=f"{frontend_url}/?strava=success")
+
+
+@router.get("/stats/ytd")
+def get_ytd_stats(db: Session = Depends(get_db)):
+    """
+    Get cached year-to-date statistics.
+    Returns run and ride totals for current year.
+    """
+    stats = db.query(StravaStats).filter(StravaStats.stats_type == "ytd").first()
+    
+    if not stats:
+        raise HTTPException(
+            status_code=404,
+            detail="YTD stats not cached yet. Try /strava/refresh-data"
+        )
+    
+    return stats.to_dict()
+
+
+@router.get("/stats/activities")
+def get_activities(db: Session = Depends(get_db)):
+    """
+    Get cached recent activities (last 30).
+    Returns list of activities with basic info.
+    """
+    stats = db.query(StravaStats).filter(StravaStats.stats_type == "recent_activities").first()
+    
+    if not stats:
+        raise HTTPException(
+            status_code=404,
+            detail="Activities not cached yet. Try /strava/refresh-data"
+        )
+    
+    return stats.to_dict()
+
+
+@router.get("/stats/monthly")
+def get_monthly_stats(db: Session = Depends(get_db)):
+    """
+    Get cached monthly aggregated statistics.
+    Returns monthly summaries for last 12 months.
+    """
+    stats = db.query(StravaStats).filter(StravaStats.stats_type == "monthly").first()
+    
+    if not stats:
+        raise HTTPException(
+            status_code=404,
+            detail="Monthly stats not cached yet. Try /strava/refresh-data"
+        )
+    
+    return stats.to_dict()
+
+
+@router.post("/refresh-data")
+def refresh_data(api_key: str = Depends(get_api_key)):
+    """
+    Manually trigger data refresh from Strava.
+    Protected endpoint - requires X-API-Key header.
+    """
+    try:
+        fetch_and_cache_stats()
+        return {"status": "success", "message": "Data refreshed successfully"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to refresh data: {str(e)}")
+
 
 app.include_router(router)

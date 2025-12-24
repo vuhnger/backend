@@ -2,3 +2,5 @@ fastapi
 uvicorn[standard]
 sqlalchemy
 psycopg2-binary
+stravalib==1.6.0
+requests==2.31.0

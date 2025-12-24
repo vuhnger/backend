@@ -16,7 +16,7 @@ services:
       timeout: 5s
       retries: 5
 
-  calendar-api:
+  strava-api:
     build: .
     restart: unless-stopped
     ports:
@@ -24,6 +24,9 @@ services:
     environment:
       DATABASE_URL: postgresql+psycopg2://${POSTGRES_USER:-backend_user}:${POSTGRES_PASSWORD:-changeme}@db:5432/${POSTGRES_DB:-backend_db}
       INTERNAL_API_KEY: ${INTERNAL_API_KEY}
+      STRAVA_CLIENT_ID: ${STRAVA_CLIENT_ID}
+      STRAVA_CLIENT_SECRET: ${STRAVA_CLIENT_SECRET}
+      STRAVA_REDIRECT_URI: ${STRAVA_REDIRECT_URI}
     depends_on:
       db:
         condition: service_healthy
