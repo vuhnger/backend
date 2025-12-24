@@ -1,17 +1,4 @@
 services:
-  caddy:
-    image: caddy:2-alpine
-    restart: unless-stopped
-    ports:
-      - "80:80"
-      - "443:443"
-    volumes:
-      - ./Caddyfile:/etc/caddy/Caddyfile
-      - caddy_data:/data
-      - caddy_config:/config
-    networks:
-      - backend
-
   db:
     image: postgres:16-alpine
     restart: unless-stopped
@@ -32,8 +19,8 @@ services:
   calendar-api:
     build: .
     restart: unless-stopped
-    expose:
-      - "5001"
+    ports:
+      - "127.0.0.1:5001:5001"
     environment:
       DATABASE_URL: postgresql+psycopg2://${POSTGRES_USER:-backend_user}:${POSTGRES_PASSWORD:-changeme}@db:5432/${POSTGRES_DB:-backend_db}
       INTERNAL_API_KEY: ${INTERNAL_API_KEY}
@@ -47,6 +34,4 @@ networks:
   backend:
 
 volumes:
-  caddy_data:
-  caddy_config:
   postgres_data:
