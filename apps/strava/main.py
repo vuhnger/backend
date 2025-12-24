@@ -85,7 +85,7 @@ def oauth_callback(code: str, state: str, db: Session = Depends(get_db)):
     Exchanges code for tokens and stores in database.
     """
     # Verify state for CSRF protection
-    if state \!= oauth_state:
+    if state != oauth_state:
         raise HTTPException(status_code=400, detail="Invalid state parameter")
     
     client_id = os.getenv("STRAVA_CLIENT_ID")
