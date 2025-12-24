@@ -6,7 +6,7 @@ NO models are defined here - this is just infrastructure.
 """
 
 import os
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker, declarative_base
 from sqlalchemy.pool import NullPool
 
@@ -53,7 +53,7 @@ def check_db_connection() -> bool:
     """
     try:
         with engine.connect() as conn:
-            conn.execute("SELECT 1")
+            conn.execute(text("SELECT 1"))
         return True
     except Exception:
         return False
