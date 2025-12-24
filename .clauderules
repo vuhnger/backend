@@ -1,0 +1,16 @@
+# Claude Code Rules
+
+## Style Preferences
+- No emojis in any files
+- Write documentation that sounds like a human wrote it
+- Keep things concise and practical
+- Focus on what matters, skip the fluff
+
+## Commit Practices
+- Make commits after each logical piece of work
+- Write clear, descriptive commit messages
+- Don't batch unrelated changes
+
+## General
+- Don't include server-specific information in documentation
+- Keep README focused on setup and usage
