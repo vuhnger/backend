@@ -101,12 +101,20 @@ def oauth_callback(code: str, state: str, db: Session = Depends(get_db)):
         client_secret=client_secret,
         code=code
     )
-    
+
     # Extract token data
     access_token = token_response["access_token"]
     refresh_token = token_response["refresh_token"]
     expires_at = token_response["expires_at"]
-    athlete_id = token_response["athlete"]["id"]
+
+    # Get athlete ID - either from token response or by fetching athlete
+    if "athlete" in token_response and "id" in token_response["athlete"]:
+        athlete_id = token_response["athlete"]["id"]
+    else:
+        # Fetch athlete info using the access token
+        client.access_token = access_token
+        athlete = client.get_athlete()
+        athlete_id = athlete.id
     
     # Store in database (single user, id=1)
     existing_auth = db.query(StravaAuth).filter(StravaAuth.id == 1).first()
