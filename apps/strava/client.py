@@ -28,13 +28,13 @@ def get_ytd_stats(db: Session) -> dict:
         "run": {
             "count": ytd_run.count,
             "distance": float(ytd_run.distance),  # meters
-            "moving_time": ytd_run.moving_time,  # seconds
+            "moving_time": int(ytd_run.moving_time.total_seconds()) if ytd_run.moving_time else 0,  # seconds
             "elevation_gain": float(ytd_run.elevation_gain)  # meters
         },
         "ride": {
             "count": ytd_ride.count,
             "distance": float(ytd_ride.distance),
-            "moving_time": ytd_ride.moving_time,
+            "moving_time": int(ytd_ride.moving_time.total_seconds()) if ytd_ride.moving_time else 0,  # seconds
             "elevation_gain": float(ytd_ride.elevation_gain)
         }
     }
@@ -58,7 +58,7 @@ def get_recent_activities(db: Session, limit: int = 30) -> list:
             "name": activity.name,
             "type": activity.type,
             "distance": float(activity.distance) if activity.distance else 0,  # meters
-            "moving_time": activity.moving_time.seconds if activity.moving_time else 0,
+            "moving_time": int(activity.moving_time.total_seconds()) if activity.moving_time else 0,  # seconds
             "elevation_gain": float(activity.total_elevation_gain) if activity.total_elevation_gain else 0,
             "start_date": activity.start_date.isoformat() if activity.start_date else None
         })
@@ -94,7 +94,7 @@ def get_monthly_stats(db: Session, months: int = 12) -> dict:
             month_key = activity.start_date.strftime("%Y-%m")
             monthly_data[month_key]["count"] += 1
             monthly_data[month_key]["distance"] += float(activity.distance) if activity.distance else 0
-            monthly_data[month_key]["moving_time"] += activity.moving_time.seconds if activity.moving_time else 0
+            monthly_data[month_key]["moving_time"] += int(activity.moving_time.total_seconds()) if activity.moving_time else 0
             monthly_data[month_key]["elevation_gain"] += float(activity.total_elevation_gain) if activity.total_elevation_gain else 0
     
     # Convert to sorted list
