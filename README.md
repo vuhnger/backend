@@ -317,7 +317,7 @@ async function getRecentActivities() {
 | `POSTGRES_USER` | Database username | Yes | `backend_user` |
 | `POSTGRES_PASSWORD` | Database password | Yes | `K8mNpQrStUvWxYz...` |
 | `POSTGRES_DB` | Database name | Yes | `backend_db` |
-| `INTERNAL_API_KEY` | API authentication key | Yes* | `Az217iopvj!.` |
+| `INTERNAL_API_KEY` | API authentication key | Yes* | `dhjklA79S...` |
 | `STRAVA_CLIENT_ID` | Strava app client ID | Yes | `161983` |
 | `STRAVA_CLIENT_SECRET` | Strava app client secret | Yes | `605d038931717...` |
 | `STRAVA_REDIRECT_URI` | OAuth callback URL | Yes | `https://api.vuhnger.dev/strava/callback` |
