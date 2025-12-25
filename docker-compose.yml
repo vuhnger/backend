@@ -22,11 +22,24 @@ services:
     ports:
       - "127.0.0.1:5001:5001"
     environment:
+      # Database connection
       DATABASE_URL: postgresql+psycopg2://${POSTGRES_USER:-backend_user}:${POSTGRES_PASSWORD:-changeme}@db:5432/${POSTGRES_DB:-backend_db}
+
+      # Environment mode
+      ENVIRONMENT: ${ENVIRONMENT:-development}
+
+      # Security keys
       INTERNAL_API_KEY: ${INTERNAL_API_KEY}
+      STATE_SECRET: ${STATE_SECRET}
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY}
+
+      # Strava OAuth
       STRAVA_CLIENT_ID: ${STRAVA_CLIENT_ID}
       STRAVA_CLIENT_SECRET: ${STRAVA_CLIENT_SECRET}
       STRAVA_REDIRECT_URI: ${STRAVA_REDIRECT_URI}
+
+      # Frontend integration
+      FRONTEND_URL: ${FRONTEND_URL:-https://vuhnger.dev}
     depends_on:
       db:
         condition: service_healthy
