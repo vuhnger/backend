@@ -35,11 +35,19 @@ app = FastAPI(
 # CORS Configuration
 origins = [
     "https://vuhnger.dev",
+    "https://www.vuhnger.dev",
     "https://vuhnger.github.io",
     "http://localhost:5173",
-    "http://localhost:3000"
+    "http://localhost:3000",
     "https://localhost:3000",
 ]
+
+# Add FRONTEND_URL from env if set (prevents missing origin issues)
+frontend_url = os.getenv("FRONTEND_URL")
+if frontend_url:
+    clean_url = frontend_url.rstrip("/")
+    if clean_url not in origins:
+        origins.append(clean_url)
 
 app.add_middleware(
     CORSMiddleware,
