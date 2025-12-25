@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Victor Uhnger | API Services</title>
+    <title>Victor Uhnger | API-tjenester</title>
     <style>
         :root { --accent: #000; --bg: #fff; --text: #000; --card-bg: #fff; --secondary: #666; }
         body {
@@ -47,8 +47,8 @@
         .service-name { font-weight: 600; font-size: 1.1rem; }
         .service-status { font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; padding: 2px 8px; border-radius: 99px; background: #f0f0f0; color: #666; }
 
-        .service-status.online { background: #000; color: #fff; }
-        .service-status.offline { background: #e0e0e0; color: #000; }
+        .service-status.online { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+        .service-status.offline { background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
 
         .service-meta { font-size: 0.85rem; color: var(--secondary); }
 
@@ -72,50 +72,50 @@
 <body>
     <div class="container">
         <h1>Victor Uhnger</h1>
-        <p class="subtitle">Personal microservices ecosystem</p>
+        <p class="subtitle">Velkommen til mikrotjenestene mine!</p>
         
         <div class="services-grid">
             <!-- Strava -->
             <div class="service-card" id="card-strava">
                 <div class="service-header">
                     <span class="service-name">🏃 Strava API</span>
-                    <span class="service-status" id="status-strava">Checking...</span>
+                    <span class="service-status" id="status-strava">Sjekker...</span>
                 </div>
-                <div class="service-meta" id="meta-strava">Activity Tracking & Stats</div>
+                <div class="service-meta" id="meta-strava">Aktivitetssporing & Statistikk</div>
             </div>
 
             <!-- Wakatime -->
             <div class="service-card" id="card-wakatime">
                 <div class="service-header">
                     <span class="service-name">👨‍💻 Wakatime API</span>
-                    <span class="service-status" id="status-wakatime">Checking...</span>
+                    <span class="service-status" id="status-wakatime">Sjekker...</span>
                 </div>
-                <div class="service-meta" id="meta-wakatime">Coding Metrics</div>
+                <div class="service-meta" id="meta-wakatime">Kodingsstatistikk</div>
             </div>
 
             <!-- Untappd -->
             <div class="service-card" id="card-untappd">
                 <div class="service-header">
                     <span class="service-name">🍺 Untappd API</span>
-                    <span class="service-status" id="status-untappd">Checking...</span>
+                    <span class="service-status" id="status-untappd">Sjekker...</span>
                 </div>
-                <div class="service-meta" id="meta-untappd">Beer Check-in statistics</div>
+                <div class="service-meta" id="meta-untappd">Øl-innsjekking statistikk</div>
             </div>
 
             <!-- n8n -->
             <div class="service-card" id="card-n8n">
                 <div class="service-header">
-                    <span class="service-name">⚙️ n8n Automation</span>
-                    <span class="service-status" id="status-n8n">Checking...</span>
+                    <span class="service-name">⚙️ n8n instansen</span>
+                    <span class="service-status" id="status-n8n">Sjekker...</span>
                 </div>
-                <div class="service-meta" id="meta-n8n">Workflow Automation</div>
+                <div class="service-meta" id="meta-n8n">Arbeidsflyt-automatisering</div>
             </div>
         </div>
 
         <div class="links">
-            <a href="/docs" class="btn btn-primary">API Documentation</a>
+            <a href="/docs" class="btn btn-primary">API-dokumentasjon</a>
             <a href="/openapi.json" class="btn btn-secondary">OpenAPI JSON</a>
-            <a href="https://vuhnger.dev" class="btn btn-secondary" target="_blank">Frontend</a>
+            <a href="https://vuhnger.dev" class="btn btn-secondary" target="_blank">Nettside</a>
         </div>
 
         <footer>
@@ -137,7 +137,7 @@
                     if (service.external) {
                         // For external services, if fetch doesn't fail, consider it online
                         const statusEl = document.getElementById(`status-${service.id}`);
-                        statusEl.innerText = 'ONLINE';
+                        statusEl.innerText = 'TILGJENGELIG';
                         statusEl.classList.add('online');
                         return;
                     }
@@ -148,7 +148,7 @@
                     if (service.external || !data) return;
                     const statusEl = document.getElementById(`status-${service.id}`);
                     if (data.status === 'ok') {
-                        statusEl.innerText = 'ONLINE';
+                        statusEl.innerText = 'TILGJENGELIG';
                         statusEl.classList.add('online');
 
                         // Optional: Add DB info if available
@@ -156,13 +156,13 @@
                             document.getElementById(`meta-${service.id}`).innerText += ` • DB: ${data.database}`;
                         }
                     } else {
-                        statusEl.innerText = 'DEGRADED';
+                        statusEl.innerText = 'DEGRADERT';
                         statusEl.classList.add('offline');
                     }
                 })
                 .catch(() => {
                     const statusEl = document.getElementById(`status-${service.id}`);
-                    statusEl.innerText = 'OFFLINE';
+                    statusEl.innerText = 'NEDE';
                     statusEl.classList.add('offline');
                 });
         });
