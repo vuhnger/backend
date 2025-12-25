@@ -5,7 +5,6 @@ OAuth integration for Strava with cached statistics.
 Single user mode - stores one set of tokens and serves cached data.
 """
 import os
-import secrets
 from fastapi import FastAPI, APIRouter, Depends, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import RedirectResponse
@@ -14,6 +13,8 @@ from stravalib.client import Client
 
 from apps.shared.database import get_db, Base, engine, check_db_connection
 from apps.shared.auth import get_api_key
+from apps.shared.oauth_state import generate_state, validate_state
+from apps.shared.errors import log_and_sanitize_error
 from apps.strava.models import StravaAuth, StravaStats
 from apps.strava.tasks import fetch_and_cache_stats
 
@@ -44,9 +45,6 @@ app.add_middleware(
 # Router setup
 router = APIRouter(prefix="/strava")
 
-# OAuth state for CSRF protection
-oauth_state = secrets.token_urlsafe(32)
-
 
 @router.get("/health")
 def health():
@@ -67,13 +65,16 @@ def authorize():
     """
     client_id = os.getenv("STRAVA_CLIENT_ID")
     redirect_uri = os.getenv("STRAVA_REDIRECT_URI")
-    
+
     if not client_id or not redirect_uri:
         raise HTTPException(status_code=500, detail="Strava OAuth not configured")
-    
+
+    # Generate secure per-request state for CSRF protection
+    state = generate_state()
+
     # Build authorization URL
-    authorize_url = f"https://www.strava.com/oauth/authorize?client_id={client_id}&redirect_uri={redirect_uri}&response_type=code&scope=read,activity:read_all&state={oauth_state}"
-    
+    authorize_url = f"https://www.strava.com/oauth/authorize?client_id={client_id}&redirect_uri={redirect_uri}&response_type=code&scope=read,activity:read_all&state={state}"
+
     return RedirectResponse(url=authorize_url)
 
 
@@ -85,58 +86,62 @@ def oauth_callback(code: str, state: str, db: Session = Depends(get_db)):
     Exchanges code for tokens and stores in database.
     """
     # Verify state for CSRF protection
-    if state != oauth_state:
-        raise HTTPException(status_code=400, detail="Invalid state parameter")
+    if not validate_state(state):
+        raise HTTPException(status_code=400, detail="Invalid or expired state parameter")
     
     client_id = os.getenv("STRAVA_CLIENT_ID")
     client_secret = os.getenv("STRAVA_CLIENT_SECRET")
     
     if not client_id or not client_secret:
         raise HTTPException(status_code=500, detail="Strava OAuth not configured")
-    
-    # Exchange code for tokens
-    client = Client()
-    token_response = client.exchange_code_for_token(
-        client_id=client_id,
-        client_secret=client_secret,
-        code=code
-    )
 
-    # Extract token data
-    access_token = token_response["access_token"]
-    refresh_token = token_response["refresh_token"]
-    expires_at = token_response["expires_at"]
-
-    # Get athlete ID - either from token response or by fetching athlete
-    if "athlete" in token_response and "id" in token_response["athlete"]:
-        athlete_id = token_response["athlete"]["id"]
-    else:
-        # Fetch athlete info using the access token
-        client.access_token = access_token
-        athlete = client.get_athlete()
-        athlete_id = athlete.id
-    
-    # Store in database (single user, id=1)
-    existing_auth = db.query(StravaAuth).filter(StravaAuth.id == 1).first()
-    
-    if existing_auth:
-        # Update existing
-        existing_auth.athlete_id = athlete_id
-        existing_auth.access_token = access_token
-        existing_auth.refresh_token = refresh_token
-        existing_auth.expires_at = expires_at
-    else:
-        # Create new
-        auth = StravaAuth(
-            id=1,
-            athlete_id=athlete_id,
-            access_token=access_token,
-            refresh_token=refresh_token,
-            expires_at=expires_at
+    try:
+        # Exchange code for tokens
+        client = Client()
+        token_response = client.exchange_code_for_token(
+            client_id=client_id,
+            client_secret=client_secret,
+            code=code
         )
-        db.add(auth)
-    
-    db.commit()
+
+        # Extract token data
+        access_token = token_response["access_token"]
+        refresh_token = token_response["refresh_token"]
+        expires_at = token_response["expires_at"]
+
+        # Get athlete ID - either from token response or by fetching athlete
+        if "athlete" in token_response and "id" in token_response["athlete"]:
+            athlete_id = token_response["athlete"]["id"]
+        else:
+            # Fetch athlete info using the access token
+            client.access_token = access_token
+            athlete = client.get_athlete()
+            athlete_id = athlete.id
+
+        # Store in database (single user, id=1) using atomic upsert
+        from apps.shared.upsert import atomic_upsert_auth
+
+        atomic_upsert_auth(
+            db=db,
+            model=StravaAuth,
+            auth_data={
+                'id': 1,
+                'athlete_id': athlete_id,
+                'access_token': access_token,
+                'refresh_token': refresh_token,
+                'expires_at': expires_at
+            }
+        )
+        db.commit()
+    except Exception as e:
+        # Rollback any pending database changes to maintain session consistency
+        db.rollback()
+        sanitized_msg, error_id = log_and_sanitize_error(
+            e,
+            "OAuth token exchange",
+            "OAuth authorization failed. Please try again."
+        )
+        raise HTTPException(status_code=500, detail=sanitized_msg)
     
     # Trigger initial data fetch (async would be better, but simple sync for now)
     try:
@@ -210,7 +215,12 @@ def refresh_data(api_key: str = Depends(get_api_key)):
         fetch_and_cache_stats()
         return {"status": "success", "message": "Data refreshed successfully"}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to refresh data: {str(e)}")
+        sanitized_msg, error_id = log_and_sanitize_error(
+            e,
+            "Data refresh",
+            "Failed to refresh Strava data"
+        )
+        raise HTTPException(status_code=500, detail=sanitized_msg)
 
 
 app.include_router(router)

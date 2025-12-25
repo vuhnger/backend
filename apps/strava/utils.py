@@ -22,43 +22,51 @@ def refresh_strava_token(db: Session) -> dict:
     """
     Refresh Strava access token using refresh token.
     Returns new token data or raises exception.
+
+    Rolls back database changes if token refresh or update fails.
     """
     # Get current auth (single user, id=1)
     auth = db.query(StravaAuth).filter(StravaAuth.id == 1).first()
-    
+
     if not auth:
         raise ValueError("No Strava authentication found. Please complete OAuth flow first.")
-    
+
     # Prepare token refresh request
     client_id = os.getenv("STRAVA_CLIENT_ID")
     client_secret = os.getenv("STRAVA_CLIENT_SECRET")
-    
+
     if not client_id or not client_secret:
         raise ValueError("Strava credentials not configured")
-    
-    # Request new tokens from Strava
-    response = requests.post(
-        "https://www.strava.com/oauth/token",
-        data={
-            "client_id": client_id,
-            "client_secret": client_secret,
-            "grant_type": "refresh_token",
-            "refresh_token": auth.refresh_token
-        }
-    )
-    
-    if response.status_code != 200:
-        raise Exception(f"Failed to refresh token: {response.text}")
-    
-    token_data = response.json()
-    
-    # Update database with new tokens
-    auth.access_token = token_data["access_token"]
-    auth.refresh_token = token_data["refresh_token"]
-    auth.expires_at = token_data["expires_at"]
-    db.commit()
-    
-    return token_data
+
+    try:
+        # Request new tokens from Strava
+        response = requests.post(
+            "https://www.strava.com/oauth/token",
+            data={
+                "client_id": client_id,
+                "client_secret": client_secret,
+                "grant_type": "refresh_token",
+                "refresh_token": auth.refresh_token
+            }
+        )
+
+        if response.status_code != 200:
+            raise Exception(f"Failed to refresh token: {response.text}")
+
+        token_data = response.json()
+
+        # Update database with new tokens
+        auth.access_token = token_data["access_token"]
+        auth.refresh_token = token_data["refresh_token"]
+        auth.expires_at = token_data["expires_at"]
+        db.commit()
+
+        return token_data
+
+    except Exception as e:
+        # Rollback on any failure (network, API, or database)
+        db.rollback()
+        raise
 
 
 def get_valid_token(db: Session) -> str:
