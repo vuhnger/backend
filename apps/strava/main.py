@@ -460,7 +460,7 @@ def landing_page():
     <body>
         <div class="container">
             <h1>Victor Uhnger</h1>
-            <p>Personal API services powering activity tracking,<br>statistics, and automated workflows.</p>
+            <p>Personal API services powering my frontend<br>statistics, and my AI-powered workflows.</p>
             
             <div class="links">
                 <a href="/docs" class="btn btn-primary">Interactive Docs</a>
