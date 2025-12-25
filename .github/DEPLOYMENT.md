@@ -54,6 +54,33 @@ git pull origin main
 docker compose down && docker compose up -d --build
 ```
 
+## Oppsett av n8n health check
+
+For at n8n-statussjekken skal fungere, må du legge til n8n-tjenesten i `docker-compose.yml` på serveren:
+
+```yaml
+  n8n-api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: ["uvicorn", "apps.n8n.main:app", "--host", "0.0.0.0", "--port", "5004"]
+    restart: unless-stopped
+    expose:
+      - "5004"
+    environment:
+      INTERNAL_API_KEY: ${INTERNAL_API_KEY}
+    networks:
+      - backend
+```
+
+Og legg til ruting i Caddyfile:
+
+```
+handle_path /n8n/* {
+    reverse_proxy n8n-api:5004
+}
+```
+
 ## Feilsøking
 
 Hvis deployment feiler:

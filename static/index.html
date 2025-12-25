@@ -108,7 +108,7 @@
                     <span class="service-name">⚙️ n8n instansen</span>
                     <span class="service-status" id="status-n8n">Sjekker...</span>
                 </div>
-                <div class="service-meta" id="meta-n8n">Arbeidsflyt-automatisering</div>
+                <div class="service-meta" id="meta-n8n">Automatiserer arbeidsflyter og overvåker økosystemet med KI. </div>
             </div>
         </div>
 
@@ -128,24 +128,16 @@
             { id: 'strava', url: '/strava/health' },
             { id: 'wakatime', url: '/wakatime/health' },
             { id: 'untappd', url: '/untappd/health' },
-            { id: 'n8n', url: 'https://n8n.vuhnger.dev', external: true }
+            { id: 'n8n', url: '/n8n/health' }
         ];
 
         services.forEach(service => {
-            fetch(service.url, { mode: service.external ? 'no-cors' : 'cors' })
+            fetch(service.url)
                 .then(r => {
-                    if (service.external) {
-                        // For external services, if fetch doesn't fail, consider it online
-                        const statusEl = document.getElementById(`status-${service.id}`);
-                        statusEl.innerText = 'TILGJENGELIG';
-                        statusEl.classList.add('online');
-                        return;
-                    }
                     if (r.ok) return r.json();
                     throw new Error('Failed');
                 })
                 .then(data => {
-                    if (service.external || !data) return;
                     const statusEl = document.getElementById(`status-${service.id}`);
                     if (data.status === 'ok') {
                         statusEl.innerText = 'TILGJENGELIG';
