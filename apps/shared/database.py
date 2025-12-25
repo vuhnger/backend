@@ -11,7 +11,13 @@ from sqlalchemy.orm import sessionmaker, declarative_base
 from sqlalchemy.pool import NullPool
 
 # Get database URL from environment variable
-DATABASE_URL = os.getenv("DATABASE_URL", "postgresql+psycopg2://backend_user:changeme@db:5432/backend_db")
+DATABASE_URL = os.getenv("DATABASE_URL")
+
+if not DATABASE_URL:
+    raise RuntimeError(
+        "DATABASE_URL environment variable must be set. "
+        "Example: postgresql+psycopg2://user:password@host:5432/database"
+    )
 
 # Create engine
 # Using NullPool for better compatibility with containerized environments

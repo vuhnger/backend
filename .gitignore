@@ -108,6 +108,13 @@ Desktop.ini
 .claude
 
 # ===================================
+# Planning and Internal Documentation
+# ===================================
+
+# Planning documents (security audits, QA reports, implementation plans)
+plans/
+
+# ===================================
 # Temporary Files
 # ===================================
 
