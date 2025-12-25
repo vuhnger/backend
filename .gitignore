@@ -133,3 +133,4 @@ test_*.py
 *_test.py
 benchmark_*.py
 
+refresh.sh
