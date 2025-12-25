@@ -251,38 +251,881 @@ origins = [
 ]
 ```
 
-### Example: Fetch YTD Stats
-
-```javascript
-// Fetch year-to-date statistics
-async function getYTDStats() {
-  const response = await fetch('https://api.vuhnger.dev/strava/stats/ytd');
-  const data = await response.json();
-
-  console.log(`Runs this year: ${data.data.run.count}`);
-  console.log(`Distance: ${(data.data.run.distance / 1000).toFixed(2)} km`);
-  console.log(`Time: ${(data.data.run.moving_time / 3600).toFixed(1)} hours`);
-}
-```
-
-### Example: Display Recent Activities
-
-```javascript
-async function getRecentActivities() {
-  const response = await fetch('https://api.vuhnger.dev/strava/stats/activities');
-  const data = await response.json();
-
-  data.data.forEach(activity => {
-    console.log(`${activity.name}: ${(activity.distance / 1000).toFixed(2)} km`);
-  });
-}
-```
-
 ### Data Freshness
 
 - Stats are cached and updated hourly (via cron job)
 - Check the `fetched_at` timestamp to see when data was last updated
 - OAuth tokens are automatically refreshed before each API call (expires after 6 hours)
+
+### TypeScript Types
+
+```typescript
+// API Response Types
+interface StravaStats {
+  count: number;
+  distance: number;        // meters
+  moving_time: number;     // seconds
+  elevation_gain: number;  // meters
+}
+
+interface YTDResponse {
+  type: 'ytd';
+  data: {
+    run: StravaStats;
+    ride: StravaStats;
+  };
+  fetched_at: string;
+}
+
+interface Activity {
+  id: number;
+  name: string;
+  type: string;
+  distance: number;        // meters
+  moving_time: number;     // seconds
+  elevation_gain: number;  // meters
+  start_date: string;      // ISO 8601
+}
+
+interface ActivitiesResponse {
+  type: 'recent_activities';
+  data: Activity[];
+  fetched_at: string;
+}
+
+interface MonthlyStats {
+  count: number;
+  distance: number;
+  moving_time: number;
+  elevation_gain: number;
+}
+
+interface MonthlyResponse {
+  type: 'monthly';
+  data: Record<string, MonthlyStats>;  // Key format: "YYYY-MM"
+  fetched_at: string;
+}
+
+interface HealthResponse {
+  status: string;
+  service: string;
+  database: string;
+}
+```
+
+### Utility Functions
+
+```typescript
+// Format distance in meters to kilometers
+function formatDistance(meters: number): string {
+  return (meters / 1000).toFixed(2);
+}
+
+// Format time in seconds to hours
+function formatTime(seconds: number): string {
+  return (seconds / 3600).toFixed(1);
+}
+
+// Format pace (min/km)
+function formatPace(meters: number, seconds: number): string {
+  const minutesPerKm = (seconds / 60) / (meters / 1000);
+  const mins = Math.floor(minutesPerKm);
+  const secs = Math.round((minutesPerKm - mins) * 60);
+  return `${mins}:${secs.toString().padStart(2, '0')}`;
+}
+
+// Format elevation gain
+function formatElevation(meters: number): string {
+  return Math.round(meters).toString();
+}
+
+// Format date for display
+function formatDate(isoDate: string): string {
+  return new Date(isoDate).toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric'
+  });
+}
+
+// Calculate time since last update
+function getTimeSinceUpdate(fetchedAt: string): string {
+  const now = new Date();
+  const fetched = new Date(fetchedAt);
+  const diffMs = now.getTime() - fetched.getTime();
+  const diffMins = Math.floor(diffMs / 60000);
+
+  if (diffMins < 60) return `${diffMins} minutes ago`;
+  const diffHours = Math.floor(diffMins / 60);
+  if (diffHours < 24) return `${diffHours} hours ago`;
+  const diffDays = Math.floor(diffHours / 24);
+  return `${diffDays} days ago`;
+}
+```
+
+### API Client (Vanilla JavaScript/TypeScript)
+
+```typescript
+class StravaAPIClient {
+  private baseURL: string;
+
+  constructor(baseURL = 'https://api.vuhnger.dev') {
+    this.baseURL = baseURL;
+  }
+
+  private async request<T>(endpoint: string): Promise<T> {
+    try {
+      const response = await fetch(`${this.baseURL}${endpoint}`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'omit', // No cookies needed
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+
+      return await response.json();
+    } catch (error) {
+      if (error instanceof TypeError && error.message.includes('fetch')) {
+        throw new Error('Network error: Unable to connect to API');
+      }
+      throw error;
+    }
+  }
+
+  async getHealth(): Promise<HealthResponse> {
+    return this.request<HealthResponse>('/strava/health');
+  }
+
+  async getYTDStats(): Promise<YTDResponse> {
+    return this.request<YTDResponse>('/strava/stats/ytd');
+  }
+
+  async getRecentActivities(): Promise<ActivitiesResponse> {
+    return this.request<ActivitiesResponse>('/strava/stats/activities');
+  }
+
+  async getMonthlyStats(): Promise<MonthlyResponse> {
+    return this.request<MonthlyResponse>('/strava/stats/monthly');
+  }
+
+  async refreshData(apiKey: string): Promise<{ status: string; message: string }> {
+    const response = await fetch(`${this.baseURL}/strava/refresh-data`, {
+      method: 'POST',
+      headers: {
+        'X-API-Key': apiKey,
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+    }
+
+    return await response.json();
+  }
+}
+
+// Usage
+const client = new StravaAPIClient();
+```
+
+### React Example: YTD Stats Component
+
+```typescript
+import { useState, useEffect } from 'react';
+
+interface YTDStatsProps {
+  apiURL?: string;
+}
+
+export function YTDStats({ apiURL = 'https://api.vuhnger.dev' }: YTDStatsProps) {
+  const [stats, setStats] = useState<YTDResponse | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    async function fetchStats() {
+      try {
+        setLoading(true);
+        setError(null);
+
+        const response = await fetch(`${apiURL}/strava/stats/ytd`);
+
+        if (!response.ok) {
+          throw new Error(`Failed to fetch: ${response.status}`);
+        }
+
+        const data = await response.json();
+        setStats(data);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Unknown error');
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    fetchStats();
+  }, [apiURL]);
+
+  if (loading) {
+    return (
+      <div className="stats-loading" role="status" aria-live="polite">
+        <p>Loading statistics...</p>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="stats-error" role="alert" aria-live="assertive">
+        <p>Error loading stats: {error}</p>
+        <button onClick={() => window.location.reload()}>Retry</button>
+      </div>
+    );
+  }
+
+  if (!stats) {
+    return <div>No data available</div>;
+  }
+
+  const { run, ride } = stats.data;
+  const lastUpdate = getTimeSinceUpdate(stats.fetched_at);
+
+  return (
+    <div className="ytd-stats">
+      <header>
+        <h2>Year-to-Date Statistics</h2>
+        <p className="last-update">Updated {lastUpdate}</p>
+      </header>
+
+      <section className="activity-type" aria-labelledby="run-heading">
+        <h3 id="run-heading">Running</h3>
+        <dl className="stats-grid">
+          <div>
+            <dt>Activities</dt>
+            <dd>{run.count}</dd>
+          </div>
+          <div>
+            <dt>Distance</dt>
+            <dd>{formatDistance(run.distance)} km</dd>
+          </div>
+          <div>
+            <dt>Time</dt>
+            <dd>{formatTime(run.moving_time)} hours</dd>
+          </div>
+          <div>
+            <dt>Elevation</dt>
+            <dd>{formatElevation(run.elevation_gain)} m</dd>
+          </div>
+          <div>
+            <dt>Avg Pace</dt>
+            <dd>{formatPace(run.distance, run.moving_time)} /km</dd>
+          </div>
+        </dl>
+      </section>
+
+      <section className="activity-type" aria-labelledby="ride-heading">
+        <h3 id="ride-heading">Cycling</h3>
+        <dl className="stats-grid">
+          <div>
+            <dt>Activities</dt>
+            <dd>{ride.count}</dd>
+          </div>
+          <div>
+            <dt>Distance</dt>
+            <dd>{formatDistance(ride.distance)} km</dd>
+          </div>
+          <div>
+            <dt>Time</dt>
+            <dd>{formatTime(ride.moving_time)} hours</dd>
+          </div>
+          <div>
+            <dt>Elevation</dt>
+            <dd>{formatElevation(ride.elevation_gain)} m</dd>
+          </div>
+        </dl>
+      </section>
+    </div>
+  );
+}
+```
+
+### React Example: Recent Activities List
+
+```typescript
+import { useState, useEffect } from 'react';
+
+export function RecentActivities() {
+  const [activities, setActivities] = useState<Activity[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    async function fetchActivities() {
+      try {
+        setLoading(true);
+        const response = await fetch('https://api.vuhnger.dev/strava/stats/activities');
+
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}`);
+        }
+
+        const data: ActivitiesResponse = await response.json();
+        setActivities(data.data);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Failed to load');
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    fetchActivities();
+  }, []);
+
+  if (loading) {
+    return <div role="status">Loading activities...</div>;
+  }
+
+  if (error) {
+    return <div role="alert">Error: {error}</div>;
+  }
+
+  return (
+    <div className="activities-list">
+      <h2>Recent Activities</h2>
+      <ul>
+        {activities.map(activity => (
+          <li key={activity.id} className="activity-card">
+            <div className="activity-header">
+              <h3>{activity.name}</h3>
+              <span className="activity-type">{activity.type}</span>
+            </div>
+            <div className="activity-stats">
+              <span>{formatDistance(activity.distance)} km</span>
+              <span>{formatTime(activity.moving_time)} hrs</span>
+              <span>{formatPace(activity.distance, activity.moving_time)} /km</span>
+              <span>{formatElevation(activity.elevation_gain)} m</span>
+            </div>
+            <time dateTime={activity.start_date}>
+              {formatDate(activity.start_date)}
+            </time>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+```
+
+### Vue 3 Example: Monthly Stats
+
+```vue
+<template>
+  <div class="monthly-stats">
+    <h2>Monthly Statistics</h2>
+
+    <div v-if="loading" role="status">
+      Loading monthly data...
+    </div>
+
+    <div v-else-if="error" role="alert" class="error">
+      {{ error }}
+    </div>
+
+    <div v-else-if="monthlyData" class="chart-container">
+      <div
+        v-for="(stats, month) in monthlyData"
+        :key="month"
+        class="month-bar"
+      >
+        <div class="month-label">{{ formatMonth(month) }}</div>
+        <div class="bar-wrapper">
+          <div
+            class="bar"
+            :style="{ width: getBarWidth(stats.distance) }"
+            :aria-label="`${formatMonth(month)}: ${formatDistance(stats.distance)} km`"
+          >
+            {{ formatDistance(stats.distance) }} km
+          </div>
+        </div>
+        <div class="month-details">
+          <span>{{ stats.count }} activities</span>
+          <span>{{ formatTime(stats.moving_time) }} hrs</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</template>
+
+<script setup lang="ts">
+import { ref, onMounted } from 'vue';
+
+const loading = ref(true);
+const error = ref<string | null>(null);
+const monthlyData = ref<Record<string, MonthlyStats> | null>(null);
+const maxDistance = ref(0);
+
+async function fetchMonthlyStats() {
+  try {
+    loading.value = true;
+    error.value = null;
+
+    const response = await fetch('https://api.vuhnger.dev/strava/stats/monthly');
+
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`);
+    }
+
+    const data: MonthlyResponse = await response.json();
+    monthlyData.value = data.data;
+
+    // Calculate max distance for bar chart scaling
+    maxDistance.value = Math.max(
+      ...Object.values(data.data).map(s => s.distance)
+    );
+  } catch (err) {
+    error.value = err instanceof Error ? err.message : 'Failed to load';
+  } finally {
+    loading.value = false;
+  }
+}
+
+function formatMonth(yearMonth: string): string {
+  const [year, month] = yearMonth.split('-');
+  const date = new Date(Number(year), Number(month) - 1);
+  return date.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+}
+
+function getBarWidth(distance: number): string {
+  const percentage = (distance / maxDistance.value) * 100;
+  return `${Math.max(percentage, 5)}%`; // Minimum 5% width
+}
+
+onMounted(() => {
+  fetchMonthlyStats();
+});
+</script>
+
+<style scoped>
+.month-bar {
+  margin-bottom: 1rem;
+}
+
+.bar {
+  background: linear-gradient(90deg, #fc4c02, #fc7302);
+  padding: 0.5rem;
+  color: white;
+  font-weight: 600;
+  transition: width 0.3s ease;
+}
+
+.month-details {
+  display: flex;
+  gap: 1rem;
+  font-size: 0.875rem;
+  color: #666;
+  margin-top: 0.25rem;
+}
+</style>
+```
+
+### Custom Hook (React)
+
+```typescript
+import { useState, useEffect } from 'react';
+
+interface UseStravaStatsOptions {
+  endpoint: 'ytd' | 'activities' | 'monthly';
+  apiURL?: string;
+  refreshInterval?: number; // milliseconds
+}
+
+interface UseStravaStatsResult<T> {
+  data: T | null;
+  loading: boolean;
+  error: string | null;
+  refetch: () => Promise<void>;
+  lastUpdate: string | null;
+}
+
+export function useStravaStats<T>({
+  endpoint,
+  apiURL = 'https://api.vuhnger.dev',
+  refreshInterval
+}: UseStravaStatsOptions): UseStravaStatsResult<T> {
+  const [data, setData] = useState<T | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [lastUpdate, setLastUpdate] = useState<string | null>(null);
+
+  const fetchData = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+
+      const response = await fetch(`${apiURL}/strava/stats/${endpoint}`);
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+
+      const result = await response.json();
+      setData(result.data);
+      setLastUpdate(result.fetched_at);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Unknown error');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchData();
+
+    if (refreshInterval) {
+      const interval = setInterval(fetchData, refreshInterval);
+      return () => clearInterval(interval);
+    }
+  }, [endpoint, apiURL, refreshInterval]);
+
+  return {
+    data,
+    loading,
+    error,
+    refetch: fetchData,
+    lastUpdate
+  };
+}
+
+// Usage example
+function MyComponent() {
+  const { data, loading, error, refetch, lastUpdate } = useStravaStats<YTDResponse['data']>({
+    endpoint: 'ytd',
+    refreshInterval: 60000 // Refresh every minute
+  });
+
+  if (loading) return <div>Loading...</div>;
+  if (error) return <div>Error: {error}</div>;
+  if (!data) return <div>No data</div>;
+
+  return (
+    <div>
+      <button onClick={refetch}>Refresh</button>
+      <p>Last updated: {lastUpdate ? getTimeSinceUpdate(lastUpdate) : 'Unknown'}</p>
+      <div>Runs: {data.run.count}</div>
+    </div>
+  );
+}
+```
+
+### Error Handling Best Practices
+
+```typescript
+class StravaAPIError extends Error {
+  constructor(
+    message: string,
+    public statusCode?: number,
+    public endpoint?: string
+  ) {
+    super(message);
+    this.name = 'StravaAPIError';
+  }
+}
+
+async function fetchWithErrorHandling<T>(
+  url: string,
+  options?: RequestInit
+): Promise<T> {
+  try {
+    const response = await fetch(url, options);
+
+    // Handle HTTP errors
+    if (!response.ok) {
+      if (response.status === 404) {
+        throw new StravaAPIError(
+          'No data available. Complete OAuth flow first.',
+          404,
+          url
+        );
+      }
+
+      if (response.status === 500) {
+        throw new StravaAPIError(
+          'Server error. Please try again later.',
+          500,
+          url
+        );
+      }
+
+      throw new StravaAPIError(
+        `Request failed: ${response.statusText}`,
+        response.status,
+        url
+      );
+    }
+
+    return await response.json();
+  } catch (error) {
+    // Network errors
+    if (error instanceof TypeError && error.message.includes('fetch')) {
+      throw new StravaAPIError(
+        'Network error. Check your internet connection.',
+        undefined,
+        url
+      );
+    }
+
+    // Re-throw StravaAPIError
+    if (error instanceof StravaAPIError) {
+      throw error;
+    }
+
+    // Unknown errors
+    throw new StravaAPIError(
+      error instanceof Error ? error.message : 'Unknown error',
+      undefined,
+      url
+    );
+  }
+}
+
+// Usage with user-friendly error messages
+async function displayStats() {
+  try {
+    const data = await fetchWithErrorHandling<YTDResponse>(
+      'https://api.vuhnger.dev/strava/stats/ytd'
+    );
+    console.log(data);
+  } catch (error) {
+    if (error instanceof StravaAPIError) {
+      // Display user-friendly error
+      alert(error.message);
+
+      // Log technical details for debugging
+      console.error('API Error:', {
+        message: error.message,
+        statusCode: error.statusCode,
+        endpoint: error.endpoint
+      });
+    }
+  }
+}
+```
+
+### Loading States Example
+
+```typescript
+import { useState } from 'react';
+
+type LoadingState = 'idle' | 'loading' | 'success' | 'error';
+
+export function StatsWithStates() {
+  const [state, setState] = useState<LoadingState>('idle');
+  const [data, setData] = useState<YTDResponse | null>(null);
+  const [errorMsg, setErrorMsg] = useState('');
+
+  async function loadStats() {
+    setState('loading');
+
+    try {
+      const response = await fetch('https://api.vuhnger.dev/strava/stats/ytd');
+
+      if (!response.ok) {
+        throw new Error('Failed to load');
+      }
+
+      const result = await response.json();
+      setData(result);
+      setState('success');
+    } catch (error) {
+      setErrorMsg(error instanceof Error ? error.message : 'Unknown error');
+      setState('error');
+    }
+  }
+
+  return (
+    <div>
+      {state === 'idle' && (
+        <button onClick={loadStats}>Load Stats</button>
+      )}
+
+      {state === 'loading' && (
+        <div className="spinner" role="status" aria-live="polite">
+          <span className="sr-only">Loading statistics...</span>
+        </div>
+      )}
+
+      {state === 'error' && (
+        <div role="alert" className="error-message">
+          <p>{errorMsg}</p>
+          <button onClick={loadStats}>Try Again</button>
+        </div>
+      )}
+
+      {state === 'success' && data && (
+        <div className="stats-content">
+          {/* Display stats */}
+        </div>
+      )}
+    </div>
+  );
+}
+```
+
+### Complete Production Example
+
+```typescript
+// strava-dashboard.tsx
+import { useState, useEffect } from 'react';
+
+interface DashboardProps {
+  apiURL?: string;
+}
+
+export function StravaDashboard({ apiURL = 'https://api.vuhnger.dev' }: DashboardProps) {
+  const [ytdStats, setYtdStats] = useState<YTDResponse | null>(null);
+  const [activities, setActivities] = useState<Activity[]>([]);
+  const [monthly, setMonthly] = useState<Record<string, MonthlyStats> | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [lastFetch, setLastFetch] = useState<Date | null>(null);
+
+  async function fetchAllData() {
+    try {
+      setLoading(true);
+      setError(null);
+
+      // Fetch all endpoints in parallel
+      const [ytdRes, activitiesRes, monthlyRes] = await Promise.all([
+        fetch(`${apiURL}/strava/stats/ytd`),
+        fetch(`${apiURL}/strava/stats/activities`),
+        fetch(`${apiURL}/strava/stats/monthly`)
+      ]);
+
+      // Check all responses
+      if (!ytdRes.ok || !activitiesRes.ok || !monthlyRes.ok) {
+        throw new Error('One or more requests failed');
+      }
+
+      // Parse all responses
+      const [ytdData, activitiesData, monthlyData] = await Promise.all([
+        ytdRes.json(),
+        activitiesRes.json(),
+        monthlyRes.json()
+      ]);
+
+      setYtdStats(ytdData);
+      setActivities(activitiesData.data);
+      setMonthly(monthlyData.data);
+      setLastFetch(new Date());
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load data');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    fetchAllData();
+
+    // Refresh every 5 minutes
+    const interval = setInterval(fetchAllData, 5 * 60 * 1000);
+    return () => clearInterval(interval);
+  }, [apiURL]);
+
+  if (loading && !ytdStats) {
+    return (
+      <div className="dashboard-loading" role="status">
+        <div className="spinner" aria-hidden="true"></div>
+        <p>Loading your Strava data...</p>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="dashboard-error" role="alert">
+        <h2>Unable to load stats</h2>
+        <p>{error}</p>
+        <button onClick={fetchAllData}>Retry</button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="strava-dashboard">
+      <header className="dashboard-header">
+        <h1>Strava Statistics</h1>
+        {lastFetch && (
+          <p className="last-update">
+            Last updated: {getTimeSinceUpdate(lastFetch.toISOString())}
+          </p>
+        )}
+        <button
+          onClick={fetchAllData}
+          disabled={loading}
+          aria-label="Refresh statistics"
+        >
+          {loading ? 'Refreshing...' : 'Refresh'}
+        </button>
+      </header>
+
+      {ytdStats && (
+        <section className="ytd-section" aria-labelledby="ytd-heading">
+          <h2 id="ytd-heading">Year to Date</h2>
+          <div className="stats-grid">
+            <div className="stat-card">
+              <h3>Running</h3>
+              <dl>
+                <div><dt>Activities</dt><dd>{ytdStats.data.run.count}</dd></div>
+                <div><dt>Distance</dt><dd>{formatDistance(ytdStats.data.run.distance)} km</dd></div>
+                <div><dt>Time</dt><dd>{formatTime(ytdStats.data.run.moving_time)} hrs</dd></div>
+                <div><dt>Elevation</dt><dd>{formatElevation(ytdStats.data.run.elevation_gain)} m</dd></div>
+              </dl>
+            </div>
+
+            <div className="stat-card">
+              <h3>Cycling</h3>
+              <dl>
+                <div><dt>Activities</dt><dd>{ytdStats.data.ride.count}</dd></div>
+                <div><dt>Distance</dt><dd>{formatDistance(ytdStats.data.ride.distance)} km</dd></div>
+                <div><dt>Time</dt><dd>{formatTime(ytdStats.data.ride.moving_time)} hrs</dd></div>
+                <div><dt>Elevation</dt><dd>{formatElevation(ytdStats.data.ride.elevation_gain)} m</dd></div>
+              </dl>
+            </div>
+          </div>
+        </section>
+      )}
+
+      {activities.length > 0 && (
+        <section className="activities-section" aria-labelledby="activities-heading">
+          <h2 id="activities-heading">Recent Activities</h2>
+          <ul className="activities-list">
+            {activities.slice(0, 10).map(activity => (
+              <li key={activity.id} className="activity-item">
+                <div className="activity-info">
+                  <strong>{activity.name}</strong>
+                  <span className="activity-type">{activity.type}</span>
+                </div>
+                <div className="activity-metrics">
+                  <span>{formatDistance(activity.distance)} km</span>
+                  <span>{formatPace(activity.distance, activity.moving_time)} /km</span>
+                  <time dateTime={activity.start_date}>
+                    {formatDate(activity.start_date)}
+                  </time>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+    </div>
+  );
+}
+```
 
 ## Architecture
 
