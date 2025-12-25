@@ -411,6 +411,8 @@ All endpoints available at `https://api.yourdomain.com`
 | `/strava/stats/ytd` | GET | None | Year-to-date run + ride totals |
 | `/strava/stats/longest-run` | GET | None | Longest run for a year (default: current) |
 | `/strava/stats/longest-ride` | GET | None | Longest ride for a year (default: current) |
+| `/strava/stats/totals` | GET | None | All-time totals grouped by type |
+| `/strava/stats/yearly` | GET | None | Yearly totals grouped by type |
 | `/strava/stats/activities` | GET | None | Recent 30 activities (from cache) |
 | `/strava/activities` | GET | None | All activities with filtering and pagination |
 | `/strava/stats/monthly` | GET | None | Monthly aggregates (last 12 months) |

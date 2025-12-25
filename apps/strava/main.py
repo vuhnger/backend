@@ -277,6 +277,82 @@ def get_longest_ride(year: int = None, db: Session = Depends(get_db)):
     return longest_ride.to_dict()
 
 
+@router.get("/stats/totals")
+def get_all_time_totals(db: Session = Depends(get_db)):
+    """
+    Get all-time totals for each activity type.
+    """
+    from sqlalchemy import sum
+    
+    results = (
+        db.query(
+            StravaActivity.type,
+            func.count(StravaActivity.id).label("count"),
+            sum(StravaActivity.distance).label("distance"),
+            sum(StravaActivity.moving_time).label("moving_time"),
+            sum(StravaActivity.total_elevation_gain).label("elevation_gain")
+        )
+        .group_by(StravaActivity.type)
+        .all()
+    )
+
+    return {
+        "type": "all_time_totals",
+        "data": {
+            r.type: {
+                "count": r.count,
+                "distance": float(r.distance) if r.distance else 0,
+                "moving_time": int(r.moving_time) if r.moving_time else 0,
+                "elevation_gain": float(r.elevation_gain) if r.elevation_gain else 0
+            } for r in results
+        },
+        "fetched_at": datetime.now().isoformat()
+    }
+
+
+@router.get("/stats/yearly")
+def get_yearly_stats(db: Session = Depends(get_db)):
+    """
+    Get activity totals grouped by year and type.
+    """
+    from sqlalchemy import sum
+    
+    year_col = extract('year', StravaActivity.start_date_local)
+    
+    results = (
+        db.query(
+            year_col.label("year"),
+            StravaActivity.type,
+            func.count(StravaActivity.id).label("count"),
+            sum(StravaActivity.distance).label("distance"),
+            sum(StravaActivity.moving_time).label("moving_time"),
+            sum(StravaActivity.total_elevation_gain).label("elevation_gain")
+        )
+        .group_by(year_col, StravaActivity.type)
+        .order_by(desc("year"), StravaActivity.type)
+        .all()
+    )
+
+    data = {}
+    for r in results:
+        year_str = str(int(r.year))
+        if year_str not in data:
+            data[year_str] = {}
+        
+        data[year_str][r.type] = {
+            "count": r.count,
+            "distance": float(r.distance) if r.distance else 0,
+            "moving_time": int(r.moving_time) if r.moving_time else 0,
+            "elevation_gain": float(r.elevation_gain) if r.elevation_gain else 0
+        }
+
+    return {
+        "type": "yearly_stats",
+        "data": data,
+        "fetched_at": datetime.now().isoformat()
+    }
+
+
 @router.get("/activities")
 def get_all_activities_endpoint(
     limit: int = 100,
@@ -329,71 +405,91 @@ def refresh_data(api_key: str = Depends(get_api_key)):
 def landing_page():
     return """
     <!DOCTYPE html>
-    <html>
+    <html lang="en">
     <head>
-        <title>Strava API Service</title>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Victor Uhnger | API</title>
         <style>
-            body { font-family: system-ui, -apple-system, sans-serif; max-width: 800px; margin: 0 auto; padding: 2rem; line-height: 1.5; color: #333; }
-            h1 { color: #fc4c02; margin-bottom: 2rem; }
-            .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 1.5rem; }
-            .card { border: 1px solid #e1e4e8; padding: 1.5rem; border-radius: 8px; transition: all 0.2s; background: white; }
-            a.card { text-decoration: none; color: inherit; }
-            a.card:hover { transform: translateY(-3px); box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1); border-color: #fc4c02; }
-            h3 { margin-top: 0; color: #24292e; }
-            p { color: #586069; margin-bottom: 0; }
-            .status-ok { color: #28a745; font-weight: bold; }
-            .status-err { color: #cb2431; font-weight: bold; }
-            code { background: #f6f8fa; padding: 0.2em 0.4em; border-radius: 3px; font-size: 0.85em; }
+            :root { --accent: #fc4c02; --bg: #ffffff; --text: #1a1a1a; --secondary: #666666; }
+            body { 
+                font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; 
+                background: var(--bg); 
+                color: var(--text); 
+                margin: 0; 
+                display: flex; 
+                align-items: center; 
+                justify-content: center; 
+                min-height: 100vh;
+                -webkit-font-smoothing: antialiased;
+            }
+            .container { text-align: center; max-width: 600px; padding: 2rem; }
+            h1 { font-size: 2.5rem; font-weight: 800; letter-spacing: -0.03em; margin-bottom: 0.75rem; }
+            p { color: var(--secondary); font-size: 1.15rem; margin-bottom: 3rem; line-height: 1.6; }
+            .links { display: flex; gap: 1rem; justify-content: center; margin-bottom: 4rem; flex-wrap: wrap; }
+            .btn { 
+                padding: 0.8rem 1.6rem; 
+                border-radius: 8px; 
+                font-weight: 600; 
+                text-decoration: none; 
+                transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1); 
+                border: 1px solid #e5e7eb;
+                font-size: 0.95rem;
+            }
+            .btn-primary { background: var(--text); color: white; border-color: var(--text); }
+            .btn-primary:hover { background: #333; transform: translateY(-2px); }
+            .btn-secondary { background: white; color: var(--text); }
+            .btn-secondary:hover { border-color: var(--accent); color: var(--accent); transform: translateY(-2px); }
+            
+            .status { 
+                font-size: 0.85rem; 
+                color: var(--secondary); 
+                display: flex; 
+                align-items: center; 
+                justify-content: center; 
+                gap: 0.6rem;
+                padding: 0.5rem 1rem;
+                border-radius: 20px;
+                background: #f9fafb;
+                display: inline-flex;
+            }
+            .dot { width: 8px; height: 8px; border-radius: 50%; background: #d1d5db; }
+            .dot.online { background: #10b981; box-shadow: 0 0 10px rgba(16, 185, 129, 0.4); }
         </style>
     </head>
     <body>
-        <h1>🚴 Strava API Service</h1>
-        
-        <div class="grid">
-            <a href="/docs" class="card">
-                <h3>📚 Interactive Docs</h3>
-                <p>Swagger UI for testing endpoints</p>
-            </a>
-
-            <a href="/redoc" class="card">
-                <h3>📖 API Reference</h3>
-                <p>Detailed documentation (ReDoc)</p>
-            </a>
-
-            <a href="https://vuhnger.dev" class="card" target="_blank">
-                <h3>🎨 Frontend App</h3>
-                <p>Main dashboard website</p>
-            </a>
-
-            <div class="card">
-                <h3>🔌 System Status</h3>
-                <div id="health-check">Connecting...</div>
+        <div class="container">
+            <h1>Victor Uhnger</h1>
+            <p>Personal API services powering activity tracking,<br>statistics, and automated workflows.</p>
+            
+            <div class="links">
+                <a href="/docs" class="btn btn-primary">Interactive Docs</a>
+                <a href="/redoc" class="btn btn-secondary">Reference</a>
+                <a href="/openapi.json" class="btn btn-secondary">OpenAPI JSON</a>
+                <a href="https://vuhnger.dev" class="btn btn-secondary" target="_blank">Main Site</a>
             </div>
-        </div>
 
-        <div style="margin-top: 3rem; border-top: 1px solid #eee; padding-top: 1rem; color: #666; font-size: 0.9rem;">
-            <p><strong>Endpoints:</strong></p>
-            <ul style="list-style: none; padding-left: 0;">
-                <li><code>GET /strava/stats/ytd</code> - Year-to-date stats</li>
-                <li><code>GET /strava/stats/longest-run</code> - Longest run this year</li>
-                <li><code>GET /strava/stats/longest-ride</code> - Longest ride this year</li>
-                <li><code>GET /strava/activities</code> - Full activity history</li>
-            </ul>
+            <div class="status">
+                <div id="status-dot" class="dot"></div>
+                <span id="status-text">Checking system status...</span>
+            </div>
         </div>
 
         <script>
             fetch('/strava/health')
                 .then(r => r.json())
                 .then(data => {
-                    const el = document.getElementById('health-check');
+                    const dot = document.getElementById('status-dot');
+                    const text = document.getElementById('status-text');
                     if(data.status === 'ok') {
-                        el.innerHTML = '<span class="status-ok">● Operational</span><br><small>DB Connected</small>';
+                        dot.className = 'dot online';
+                        text.innerText = 'Systems Operational';
                     } else {
-                        el.innerHTML = '<span class="status-err">● Degradated</span><br><small>' + data.database + '</small>';
+                        text.innerText = 'System Degraded';
                     }
                 })
-                .catch(err => {
-                    document.getElementById('health-check').innerHTML = '<span class="status-err">● Unreachable</span>';
+                .catch(() => {
+                    document.getElementById('status-text').innerText = 'Service Unreachable';
                 });
         </script>
     </body>
