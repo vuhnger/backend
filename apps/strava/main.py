@@ -35,6 +35,7 @@ origins = [
     "https://vuhnger.dev",
     "https://vuhnger.github.io",
     "http://localhost:5173",
+    "http://localhost:3000",
 ]
 
 app.add_middleware(
