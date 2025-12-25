@@ -64,7 +64,7 @@ def refresh_strava_token(db: Session) -> Dict[str, Any]:
 
         return token_data
 
-    except Exception as e:
+    except Exception:
         # Rollback on any failure (network, API, or database)
         db.rollback()
         raise
@@ -76,14 +76,14 @@ def get_valid_token(db: Session) -> str:
     Returns access token string.
     """
     auth = db.query(StravaAuth).filter(StravaAuth.id == 1).first()
-    
+
     if not auth:
         raise ValueError("No Strava authentication found. Please complete OAuth flow first.")
-    
+
     # Check if token needs refresh
     if needs_refresh(auth.expires_at):
         refresh_strava_token(db)
         # Reload auth after refresh
         auth = db.query(StravaAuth).filter(StravaAuth.id == 1).first()
-    
+
     return auth.access_token

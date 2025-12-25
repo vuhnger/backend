@@ -106,6 +106,7 @@ Desktop.ini
 # ===================================
 
 .claude
+.clauderules
 
 # ===================================
 # Planning and Internal Documentation
@@ -123,3 +124,4 @@ plans/
 *.swp
 *.swo
 *~.clauderules
+

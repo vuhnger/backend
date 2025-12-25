@@ -16,15 +16,15 @@ def get_ytd_stats(db: Session) -> Dict[str, Dict[str, Any]]:
     """
     access_token = get_valid_token(db)
     client = Client(access_token=access_token)
-    
+
     # Get athlete stats
     athlete = client.get_athlete()
     stats = client.get_athlete_stats(athlete.id)
-    
+
     # Extract YTD totals
     ytd_run = stats.ytd_run_totals
     ytd_ride = stats.ytd_ride_totals
-    
+
     return {
         "run": {
             "count": ytd_run.count,
@@ -48,10 +48,10 @@ def get_recent_activities(db: Session, limit: int = 30) -> List[Dict[str, Any]]:
     """
     access_token = get_valid_token(db)
     client = Client(access_token=access_token)
-    
+
     # Get recent activities
     activities = client.get_activities(limit=limit)
-    
+
     result = []
     for activity in activities:
         result.append({
@@ -63,7 +63,7 @@ def get_recent_activities(db: Session, limit: int = 30) -> List[Dict[str, Any]]:
             "elevation_gain": float(activity.total_elevation_gain) if activity.total_elevation_gain else 0,
             "start_date": activity.start_date.isoformat() if activity.start_date else None
         })
-    
+
     return result
 
 
@@ -74,14 +74,14 @@ def get_monthly_stats(db: Session, months: int = 12) -> Dict[str, Dict[str, Any]
     """
     access_token = get_valid_token(db)
     client = Client(access_token=access_token)
-    
+
     # Calculate date range
     end_date = datetime.now()
     start_date = end_date - timedelta(days=months * 30)
-    
+
     # Get activities in date range
     activities = client.get_activities(after=start_date, before=end_date)
-    
+
     # Aggregate by month
     monthly_data = defaultdict(lambda: {
         "count": 0,
@@ -89,18 +89,24 @@ def get_monthly_stats(db: Session, months: int = 12) -> Dict[str, Dict[str, Any]
         "moving_time": 0,
         "elevation_gain": 0
     })
-    
+
     for activity in activities:
         if activity.start_date:
             month_key = activity.start_date.strftime("%Y-%m")
             monthly_data[month_key]["count"] += 1
-            monthly_data[month_key]["distance"] += float(activity.distance) if activity.distance else 0
-            monthly_data[month_key]["moving_time"] += int(activity.moving_time.total_seconds()) if activity.moving_time else 0
-            monthly_data[month_key]["elevation_gain"] += float(activity.total_elevation_gain) if activity.total_elevation_gain else 0
-    
+            monthly_data[month_key]["distance"] += (
+                float(activity.distance) if activity.distance else 0
+            )
+            monthly_data[month_key]["moving_time"] += (
+                int(activity.moving_time.total_seconds()) if activity.moving_time else 0
+            )
+            monthly_data[month_key]["elevation_gain"] += (
+                float(activity.total_elevation_gain) if activity.total_elevation_gain else 0
+            )
+
     # Convert to sorted list
     result = {}
     for month, data in sorted(monthly_data.items(), reverse=True):
         result[month] = data
-    
+
     return result

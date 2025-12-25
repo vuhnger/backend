@@ -21,6 +21,7 @@ app.add_middleware(
 # Router setup
 router = APIRouter(prefix="/blog")
 
+
 @router.get("/health")
 def health():
     """Health check endpoint - returns service status"""
@@ -32,5 +33,6 @@ def health():
 # @router.post("/posts")
 # @router.get("/posts/{post_id}")
 # etc.
+
 
 app.include_router(router)

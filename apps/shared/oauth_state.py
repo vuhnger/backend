@@ -10,7 +10,6 @@ import hmac
 import hashlib
 import secrets
 import base64
-from typing import Optional
 
 
 # State secret for HMAC signing (must be set in production)

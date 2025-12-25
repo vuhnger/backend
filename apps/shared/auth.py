@@ -8,7 +8,7 @@ Checks for X-API-Key header and validates against environment variable.
 import os
 import hmac
 import logging
-from fastapi import Request, HTTPException, status, Depends, Security
+from fastapi import Request, HTTPException, status, Security
 from fastapi.security import APIKeyHeader
 from starlette.middleware.base import BaseHTTPMiddleware
 

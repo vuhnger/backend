@@ -76,7 +76,14 @@ def authorize():
     state = generate_state()
 
     # Build authorization URL
-    authorize_url = f"https://www.strava.com/oauth/authorize?client_id={client_id}&redirect_uri={redirect_uri}&response_type=code&scope=read,activity:read_all&state={state}"
+    authorize_url = (
+        f"https://www.strava.com/oauth/authorize?"
+        f"client_id={client_id}&"
+        f"redirect_uri={redirect_uri}&"
+        f"response_type=code&"
+        f"scope=read,activity:read_all&"
+        f"state={state}"
+    )
 
     return RedirectResponse(url=authorize_url)
 
@@ -91,10 +98,10 @@ def oauth_callback(code: str, state: str, db: Session = Depends(get_db)):
     # Verify state for CSRF protection
     if not validate_state(state):
         raise HTTPException(status_code=400, detail="Invalid or expired state parameter")
-    
+
     client_id = os.getenv("STRAVA_CLIENT_ID")
     client_secret = os.getenv("STRAVA_CLIENT_SECRET")
-    
+
     if not client_id or not client_secret:
         raise HTTPException(status_code=500, detail="Strava OAuth not configured")
 
@@ -145,7 +152,7 @@ def oauth_callback(code: str, state: str, db: Session = Depends(get_db)):
             "OAuth authorization failed. Please try again."
         )
         raise HTTPException(status_code=500, detail=sanitized_msg)
-    
+
     # Trigger initial data fetch (async would be better, but simple sync for now)
     try:
         fetch_and_cache_stats()
@@ -164,13 +171,13 @@ def get_ytd_stats(db: Session = Depends(get_db)):
     Returns run and ride totals for current year.
     """
     stats = db.query(StravaStats).filter(StravaStats.stats_type == "ytd").first()
-    
+
     if not stats:
         raise HTTPException(
             status_code=404,
             detail="YTD stats not cached yet. Try /strava/refresh-data"
         )
-    
+
     return stats.to_dict()
 
 
@@ -181,13 +188,13 @@ def get_activities(db: Session = Depends(get_db)):
     Returns list of activities with basic info.
     """
     stats = db.query(StravaStats).filter(StravaStats.stats_type == "recent_activities").first()
-    
+
     if not stats:
         raise HTTPException(
             status_code=404,
             detail="Activities not cached yet. Try /strava/refresh-data"
         )
-    
+
     return stats.to_dict()
 
 
@@ -198,13 +205,13 @@ def get_monthly_stats(db: Session = Depends(get_db)):
     Returns monthly summaries for last 12 months.
     """
     stats = db.query(StravaStats).filter(StravaStats.stats_type == "monthly").first()
-    
+
     if not stats:
         raise HTTPException(
             status_code=404,
             detail="Monthly stats not cached yet. Try /strava/refresh-data"
         )
-    
+
     return stats.to_dict()
 
 

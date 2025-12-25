@@ -2,7 +2,7 @@
 Background tasks for fetching and caching Strava data
 """
 import logging
-from typing import Dict, List, Any
+from typing import Dict, Any
 from sqlalchemy.orm import Session
 from apps.shared.database import SessionLocal
 from apps.strava.models import StravaStats
