@@ -153,8 +153,14 @@ def atomic_upsert_auth(
     # Create INSERT statement
     stmt = pg_insert(model).values(**auth_data)
 
-    # Build ON CONFLICT DO UPDATE clause
-    update_dict = {k: v for k, v in auth_data.items() if k != 'id'}
+    # Build ON CONFLICT DO UPDATE clause using excluded (PostgreSQL pseudo-table)
+    # This ensures we use the actual column names, not Python attribute names
+    update_dict = {}
+    for key in auth_data.keys():
+        if key != 'id':  # Don't update the primary key
+            # Use excluded.<column> to reference the value that would have been inserted
+            update_dict[key] = getattr(stmt.excluded, key)
+
     if auto_update_timestamp:
         update_dict[timestamp_field] = func.now()
 
