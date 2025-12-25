@@ -125,3 +125,11 @@ plans/
 *.swo
 *~.clauderules
 
+# ===================================
+# Test Files (Local Testing)
+# ===================================
+
+test_*.py
+*_test.py
+benchmark_*.py
+

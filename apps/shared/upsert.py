@@ -10,6 +10,24 @@ Performance characteristics:
 - Reduces database lock contention
 - Provides ~2-3x throughput improvement under concurrent workload
 
+CRITICAL: Using model.__table__ instead of model
+-----------------------------------------------
+We use model.__table__ in pg_insert() to avoid issues with Python properties
+and descriptors. When a model has @property decorators for encryption:
+
+    class MyModel(Base):
+        _token = Column("token", String)  # Actual column
+
+        @property
+        def token(self):  # Property for decryption
+            return decrypt(self._token)
+
+Using pg_insert(model) fails because SQLAlchemy finds the @property first,
+causing: AttributeError: 'property' object has no attribute '_bulk_update_tuples'
+
+Using pg_insert(model.__table__) works because __table__ contains only actual
+database columns, bypassing all Python properties and descriptors.
+
 Usage:
     from apps.shared.upsert import atomic_upsert_stats
 
