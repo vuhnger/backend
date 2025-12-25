@@ -87,8 +87,8 @@ def atomic_upsert_stats(
     # Build values dictionary for INSERT
     insert_values = {unique_field: unique_value, **update_data}
 
-    # Create INSERT statement
-    stmt = pg_insert(model).values(**insert_values)
+    # Create INSERT statement using table (not model) to avoid property issues
+    stmt = pg_insert(model.__table__).values(**insert_values)
 
     # Build ON CONFLICT DO UPDATE clause
     update_dict = update_data.copy()
@@ -150,8 +150,9 @@ def atomic_upsert_auth(
     if auto_update_timestamp and not hasattr(model, timestamp_field):
         raise ValueError(f"Model {model.__name__} does not have field '{timestamp_field}'")
 
-    # Create INSERT statement
-    stmt = pg_insert(model).values(**auth_data)
+    # Create INSERT statement using table (not model) to avoid property issues
+    # Using model.__table__ ensures we work with actual DB columns, not Python properties
+    stmt = pg_insert(model.__table__).values(**auth_data)
 
     # Build ON CONFLICT DO UPDATE clause using excluded (PostgreSQL pseudo-table)
     # This ensures we use the actual column names, not Python attribute names
