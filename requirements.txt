@@ -11,4 +11,4 @@ stravalib==1.6.0
 requests==2.31.0
 
 # Security
-cryptography==42.0.0
+cryptography==44.0.1
