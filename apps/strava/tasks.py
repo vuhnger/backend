@@ -1,11 +1,15 @@
 """
 Background tasks for fetching and caching Strava data
 """
+import logging
+from typing import Dict, List, Any
 from sqlalchemy.orm import Session
 from apps.shared.database import SessionLocal
 from apps.strava.models import StravaStats
 from apps.strava.client import get_ytd_stats, get_recent_activities, get_monthly_stats
 from apps.shared.upsert import atomic_upsert_stats
+
+logger = logging.getLogger(__name__)
 
 
 def fetch_and_cache_stats():
@@ -18,37 +22,37 @@ def fetch_and_cache_stats():
     db = SessionLocal()
 
     try:
-        print("Fetching Strava data...")
+        logger.info("Fetching Strava data...")
 
         # Fetch YTD stats
         ytd_data = get_ytd_stats(db)
         upsert_stats(db, "ytd", ytd_data, commit=False)
-        print("YTD stats prepared")
+        logger.info("YTD stats prepared")
 
         # Fetch recent activities
         activities_data = get_recent_activities(db, limit=30)
         upsert_stats(db, "recent_activities", activities_data, commit=False)
-        print(f"Prepared {len(activities_data)} recent activities")
+        logger.info(f"Prepared {len(activities_data)} recent activities")
 
         # Fetch monthly stats
         monthly_data = get_monthly_stats(db, months=12)
         upsert_stats(db, "monthly", monthly_data, commit=False)
-        print(f"Prepared monthly stats for {len(monthly_data)} months")
+        logger.info(f"Prepared monthly stats for {len(monthly_data)} months")
 
         # Commit all changes atomically
         db.commit()
-        print("All Strava data cached successfully")
+        logger.info("All Strava data cached successfully")
 
     except Exception as e:
         # Rollback all pending changes on any failure
         db.rollback()
-        print(f"Error fetching Strava data: {e}")
+        logger.error(f"Error fetching Strava data: {e}", exc_info=True)
         raise
     finally:
         db.close()
 
 
-def upsert_stats(db: Session, stats_type: str, data: dict, commit: bool = True):
+def upsert_stats(db: Session, stats_type: str, data: Dict[str, Any], commit: bool = True) -> None:
     """
     Atomic insert or update of cached stats using PostgreSQL ON CONFLICT.
 

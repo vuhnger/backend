@@ -5,6 +5,7 @@ OAuth integration for Strava with cached statistics.
 Single user mode - stores one set of tokens and serves cached data.
 """
 import os
+import logging
 from fastapi import FastAPI, APIRouter, Depends, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import RedirectResponse
@@ -17,6 +18,8 @@ from apps.shared.oauth_state import generate_state, validate_state
 from apps.shared.errors import log_and_sanitize_error
 from apps.strava.models import StravaAuth, StravaStats
 from apps.strava.tasks import fetch_and_cache_stats
+
+logger = logging.getLogger(__name__)
 
 # Create database tables
 Base.metadata.create_all(bind=engine)
@@ -147,8 +150,8 @@ def oauth_callback(code: str, state: str, db: Session = Depends(get_db)):
     try:
         fetch_and_cache_stats()
     except Exception as e:
-        print(f"Initial data fetch failed: {e}")
-    
+        logger.warning(f"Initial data fetch failed: {e}", exc_info=True)
+
     # Redirect to frontend success page
     frontend_url = os.getenv("FRONTEND_URL", "https://vuhnger.dev")
     return RedirectResponse(url=f"{frontend_url}/?strava=success")
