@@ -3,12 +3,13 @@ Strava API client wrapper using stravalib
 """
 from datetime import datetime, timedelta
 from collections import defaultdict
+from typing import Dict, List, Any
 from stravalib.client import Client
 from sqlalchemy.orm import Session
 from apps.strava.utils import get_valid_token
 
 
-def get_ytd_stats(db: Session) -> dict:
+def get_ytd_stats(db: Session) -> Dict[str, Dict[str, Any]]:
     """
     Fetch year-to-date statistics from Strava.
     Returns: dict with counts, distances, times, elevation
@@ -40,7 +41,7 @@ def get_ytd_stats(db: Session) -> dict:
     }
 
 
-def get_recent_activities(db: Session, limit: int = 30) -> list:
+def get_recent_activities(db: Session, limit: int = 30) -> List[Dict[str, Any]]:
     """
     Fetch recent activities from Strava.
     Returns: list of activity dictionaries
@@ -66,7 +67,7 @@ def get_recent_activities(db: Session, limit: int = 30) -> list:
     return result
 
 
-def get_monthly_stats(db: Session, months: int = 12) -> dict:
+def get_monthly_stats(db: Session, months: int = 12) -> Dict[str, Dict[str, Any]]:
     """
     Aggregate activities by month for the last N months.
     Returns: dict with monthly summaries
