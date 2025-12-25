@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Victor Uhnger | API Services</title>
+    <style>
+        :root { --accent: #2563eb; --bg: #0f172a; --text: #f8fafc; --card-bg: #1e293b; --secondary: #94a3b8; }
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; 
+            background: var(--bg); 
+            color: var(--text); 
+            margin: 0; 
+            display: flex; 
+            flex-direction: column;
+            align-items: center; 
+            justify-content: center; 
+            min-height: 100vh;
+            -webkit-font-smoothing: antialiased;
+        }
+        .container { text-align: center; max-width: 600px; padding: 2rem; width: 100%; box-sizing: border-box; }
+        h1 { font-size: 2.5rem; font-weight: 800; letter-spacing: -0.03em; margin-bottom: 0.5rem; background: linear-gradient(to right, #60a5fa, #a78bfa); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+        p.subtitle { color: var(--secondary); font-size: 1.1rem; margin-bottom: 3rem; line-height: 1.6; }
+        
+        .services-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 1rem;
+            margin-bottom: 3rem;
+            width: 100%;
+        }
+        
+        .service-card {
+            background: var(--card-bg);
+            border: 1px solid #334155;
+            border-radius: 12px;
+            padding: 1.5rem;
+            text-align: left;
+            transition: transform 0.2s, border-color 0.2s;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .service-card:hover { transform: translateY(-2px); border-color: #475569; }
+        
+        .service-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem; }
+        .service-name { font-weight: 600; font-size: 1.1rem; }
+        .service-status { font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; padding: 2px 8px; border-radius: 99px; background: #334155; color: #94a3b8; }
+        
+        .service-status.online { background: rgba(16, 185, 129, 0.2); color: #34d399; }
+        .service-status.offline { background: rgba(239, 68, 68, 0.2); color: #f87171; }
+        
+        .service-meta { font-size: 0.85rem; color: var(--secondary); }
+
+        .links { display: flex; gap: 1rem; justify-content: center; flex-wrap: wrap; }
+        .btn { 
+            padding: 0.8rem 1.6rem; 
+            border-radius: 8px; 
+            font-weight: 600; 
+            text-decoration: none; 
+            transition: all 0.2s; 
+            font-size: 0.95rem;
+        }
+        .btn-primary { background: #3b82f6; color: white; }
+        .btn-primary:hover { background: #2563eb; }
+        .btn-secondary { background: rgba(255,255,255,0.05); color: var(--text); border: 1px solid #334155; }
+        .btn-secondary:hover { background: rgba(255,255,255,0.1); border-color: #475569; }
+
+        footer { margin-top: 4rem; color: #475569; font-size: 0.9rem; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Victor Uhnger</h1>
+        <p class="subtitle">Personal microservices ecosystem</p>
+        
+        <div class="services-grid">
+            <!-- Strava -->
+            <div class="service-card" id="card-strava">
+                <div class="service-header">
+                    <span class="service-name">🏃 Strava API</span>
+                    <span class="service-status" id="status-strava">Checking...</span>
+                </div>
+                <div class="service-meta" id="meta-strava">Activity Tracking & Stats</div>
+            </div>
+
+            <!-- Wakatime -->
+            <div class="service-card" id="card-wakatime">
+                <div class="service-header">
+                    <span class="service-name">👨‍💻 Wakatime API</span>
+                    <span class="service-status" id="status-wakatime">Checking...</span>
+                </div>
+                <div class="service-meta" id="meta-wakatime">Coding Metrics</div>
+            </div>
+
+            <!-- Untappd -->
+            <div class="service-card" id="card-untappd">
+                <div class="service-header">
+                    <span class="service-name">🍺 Untappd API</span>
+                    <span class="service-status" id="status-untappd">Checking...</span>
+                </div>
+                <div class="service-meta" id="meta-untappd">Beer Check-in statistics</div>
+            </div>
+        </div>
+
+        <div class="links">
+            <a href="/docs" class="btn btn-primary">API Documentation</a>
+            <a href="/openapi.json" class="btn btn-secondary">OpenAPI JSON</a>
+            <a href="https://vuhnger.dev" class="btn btn-secondary" target="_blank">Frontend</a>
+        </div>
+
+        <footer>
+            &copy; 2025 Victor Uhnger
+        </footer>
+    </div>
+
+    <script>
+        const services = [
+            { id: 'strava', url: '/strava/health' },
+            { id: 'wakatime', url: '/wakatime/health' },
+            { id: 'untappd', url: '/untappd/health' }
+        ];
+
+        services.forEach(service => {
+            fetch(service.url)
+                .then(r => {
+                    if (r.ok) return r.json();
+                    throw new Error('Failed');
+                })
+                .then(data => {
+                    const statusEl = document.getElementById(`status-${service.id}`);
+                    if (data.status === 'ok') {
+                        statusEl.innerText = 'ONLINE';
+                        statusEl.classList.add('online');
+                        
+                        // Optional: Add DB info if available
+                        if (data.database) {
+                            document.getElementById(`meta-${service.id}`).innerText += ` • DB: ${data.database}`;
+                        }
+                    } else {
+                        statusEl.innerText = 'DEGRADED';
+                        statusEl.classList.add('offline');
+                    }
+                })
+                .catch(() => {
+                    const statusEl = document.getElementById(`status-${service.id}`);
+                    statusEl.innerText = 'OFFLINE';
+                    statusEl.classList.add('offline');
+                });
+        });
+    </script>
+</body>
+</html>

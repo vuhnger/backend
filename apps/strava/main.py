@@ -9,7 +9,7 @@ import logging
 from datetime import datetime
 from fastapi import FastAPI, APIRouter, Depends, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import RedirectResponse, HTMLResponse
+from fastapi.responses import RedirectResponse, FileResponse
 from sqlalchemy.orm import Session
 from sqlalchemy import desc, extract
 from stravalib.client import Client
@@ -51,6 +51,11 @@ app.add_middleware(
 
 # Router setup
 router = APIRouter(prefix="/strava")
+
+
+@app.get("/", response_class=FileResponse)
+def landing_page():
+    return FileResponse("static/index.html")
 
 
 @router.get("/health")
@@ -400,100 +405,5 @@ def refresh_data(api_key: str = Depends(get_api_key)):
         )
         raise HTTPException(status_code=500, detail=sanitized_msg)
 
-
-@app.get("/", response_class=HTMLResponse)
-def landing_page():
-    return """
-    <!DOCTYPE html>
-    <html lang="en">
-    <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Victor Uhnger | API</title>
-        <style>
-            :root { --accent: #fc4c02; --bg: #ffffff; --text: #1a1a1a; --secondary: #666666; }
-            body { 
-                font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; 
-                background: var(--bg); 
-                color: var(--text); 
-                margin: 0; 
-                display: flex; 
-                align-items: center; 
-                justify-content: center; 
-                min-height: 100vh;
-                -webkit-font-smoothing: antialiased;
-            }
-            .container { text-align: center; max-width: 600px; padding: 2rem; }
-            h1 { font-size: 2.5rem; font-weight: 800; letter-spacing: -0.03em; margin-bottom: 0.75rem; }
-            p { color: var(--secondary); font-size: 1.15rem; margin-bottom: 3rem; line-height: 1.6; }
-            .links { display: flex; gap: 1rem; justify-content: center; margin-bottom: 4rem; flex-wrap: wrap; }
-            .btn { 
-                padding: 0.8rem 1.6rem; 
-                border-radius: 8px; 
-                font-weight: 600; 
-                text-decoration: none; 
-                transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1); 
-                border: 1px solid #e5e7eb;
-                font-size: 0.95rem;
-            }
-            .btn-primary { background: var(--text); color: white; border-color: var(--text); }
-            .btn-primary:hover { background: #333; transform: translateY(-2px); }
-            .btn-secondary { background: white; color: var(--text); }
-            .btn-secondary:hover { border-color: var(--accent); color: var(--accent); transform: translateY(-2px); }
-            
-            .status { 
-                font-size: 0.85rem; 
-                color: var(--secondary); 
-                display: flex; 
-                align-items: center; 
-                justify-content: center; 
-                gap: 0.6rem;
-                padding: 0.5rem 1rem;
-                border-radius: 20px;
-                background: #f9fafb;
-                display: inline-flex;
-            }
-            .dot { width: 8px; height: 8px; border-radius: 50%; background: #d1d5db; }
-            .dot.online { background: #10b981; box-shadow: 0 0 10px rgba(16, 185, 129, 0.4); }
-        </style>
-    </head>
-    <body>
-        <div class="container">
-            <h1>Victor Uhnger</h1>
-            <p>Personal API services powering my frontend<br>statistics, and my AI-powered workflows.</p>
-            
-            <div class="links">
-                <a href="/docs" class="btn btn-primary">Interactive Docs</a>
-                <a href="/redoc" class="btn btn-secondary">Reference</a>
-                <a href="/openapi.json" class="btn btn-secondary">OpenAPI JSON</a>
-                <a href="https://vuhnger.dev" class="btn btn-secondary" target="_blank">Main Site</a>
-            </div>
-
-            <div class="status">
-                <div id="status-dot" class="dot"></div>
-                <span id="status-text">Checking system status...</span>
-            </div>
-        </div>
-
-        <script>
-            fetch('/strava/health')
-                .then(r => r.json())
-                .then(data => {
-                    const dot = document.getElementById('status-dot');
-                    const text = document.getElementById('status-text');
-                    if(data.status === 'ok') {
-                        dot.className = 'dot online';
-                        text.innerText = 'Systems Operational';
-                    } else {
-                        text.innerText = 'System Degraded';
-                    }
-                })
-                .catch(() => {
-                    document.getElementById('status-text').innerText = 'Service Unreachable';
-                });
-        </script>
-    </body>
-    </html>
-    """
 
 app.include_router(router)
