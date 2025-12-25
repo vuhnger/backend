@@ -6,6 +6,7 @@ FastAPI backend for Strava activity tracking with OAuth, cached statistics, and 
 ## Features
 
 - OAuth 2.0 integration with automatic token refresh
+- Full historic activity storage for detailed aggregation
 - Hourly cached statistics (YTD, recent activities, monthly aggregates)
 - Encrypted tokens at rest (Fernet AES-128)
 - CSRF-protected OAuth flow (128-bit HMAC)
@@ -364,30 +365,31 @@ docker volume inspect backend_postgres_data
 
 ## How Data Caching Works
 
-This API implements an **hourly cache layer** between your frontend and Strava's API to reduce rate limits and improve response times.
+This API implements an **hourly cache layer** and **full activity synchronization** between your frontend and Strava's API.
 
 ### Data Flow
 
 ```
-Frontend Request → API Cache → Strava API (if cache expired)
+Frontend Request → API Cache/Database → Strava API (if sync needed)
                      ↓
-                 Database
+                 Database (Full History)
 ```
 
-1. **Initial OAuth**: When you authorize, the API fetches and caches:
-   - Year-to-date totals (runs + rides)
-   - Last 30 activities
-   - Monthly aggregates (12 months)
+1. **Initial OAuth**: When you authorize, the API performs a full sync:
+   - Fetches and stores **all historic activities** in `strava_activities` table
+   - Calculates year-to-date totals (runs + rides)
+   - Caches last 30 activities
+   - Caches monthly aggregates (12 months)
 
-2. **Subsequent Requests**: Frontend gets instant responses from database cache
+2. **Subsequent Requests**: Frontend gets instant responses from the database. Use `/strava/activities` for custom aggregations.
 
-3. **Automatic Refresh**: Cron job updates cache every hour (optional, see Step 7)
+3. **Automatic Refresh**: Cron job updates cache and syncs new activities every hour.
 
-4. **Manual Refresh**: Use `/strava/refresh-data` endpoint anytime
+4. **Manual Refresh**: Use `/strava/refresh-data` endpoint anytime.
 
 ### Cache Expiration
 
-- **Database storage**: Cached stats stored in `strava_stats` table
+- **Database storage**: Full history in `strava_activities`, aggregated stats in `strava_stats`
 - **Refresh frequency**: Hourly (via cron) or manual
 - **Token refresh**: Automatic when tokens expire (handled transparently)
 
@@ -395,7 +397,7 @@ Frontend Request → API Cache → Strava API (if cache expired)
 
 - **Strava Rate Limits**: 100 requests per 15 minutes, 1000 per day
 - **Response Speed**: Database queries are 10-100x faster than API calls
-- **Offline Resilience**: Frontend works even if Strava API is down (serves last cached data)
+- **Detailed Aggregates**: Storing individual activities allows for custom metrics (like "Longest Run") without re-fetching from Strava.
 
 ## API Endpoints
 
@@ -407,9 +409,12 @@ All endpoints available at `https://api.yourdomain.com`
 | `/strava/authorize` | GET | None | Start OAuth flow (redirects to Strava) |
 | `/strava/callback` | GET | None | OAuth callback (Strava redirects here) |
 | `/strava/stats/ytd` | GET | None | Year-to-date run + ride totals |
-| `/strava/stats/activities` | GET | None | Recent 30 activities with details |
+| `/strava/stats/longest-run` | GET | None | Longest run for a year (default: current) |
+| `/strava/stats/longest-ride` | GET | None | Longest ride for a year (default: current) |
+| `/strava/stats/activities` | GET | None | Recent 30 activities (from cache) |
+| `/strava/activities` | GET | None | All activities with filtering and pagination |
 | `/strava/stats/monthly` | GET | None | Monthly aggregates (last 12 months) |
-| `/strava/refresh-data` | POST | API Key | Manually trigger data refresh from Strava |
+| `/strava/refresh-data` | POST | API Key | Manually trigger data refresh and full sync |
 
 **Interactive API Docs**: `https://api.yourdomain.com/docs` (Swagger UI)
 

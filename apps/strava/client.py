@@ -110,3 +110,34 @@ def get_monthly_stats(db: Session, months: int = 12) -> Dict[str, Dict[str, Any]
         result[month] = data
 
     return result
+
+
+def get_all_activities(db: Session, limit: int = None):
+    """
+    Fetch all historic activities from Strava.
+    Yields activity data dictionaries suitable for StravaActivity model.
+    """
+    access_token = get_valid_token(db)
+    client = Client(access_token=access_token)
+
+    # Get all activities (paginated automatically by stravalib)
+    activities = client.get_activities(limit=limit)
+
+    for activity in activities:
+        yield {
+            "id": activity.id,
+            "name": activity.name,
+            "type": activity.type,
+            "distance": float(activity.distance) if activity.distance else 0.0,
+            "moving_time": int(activity.moving_time.total_seconds()) if activity.moving_time else 0,
+            "elapsed_time": int(activity.elapsed_time.total_seconds()) if activity.elapsed_time else 0,
+            "total_elevation_gain": float(activity.total_elevation_gain) if activity.total_elevation_gain else 0.0,
+            "start_date": activity.start_date,
+            "start_date_local": activity.start_date_local,
+            "timezone": str(activity.timezone),
+            "average_speed": float(activity.average_speed) if activity.average_speed else 0.0,
+            "max_speed": float(activity.max_speed) if activity.max_speed else 0.0,
+            "average_heartrate": float(activity.average_heartrate) if hasattr(activity, 'average_heartrate') and activity.average_heartrate else None,
+            "max_heartrate": float(activity.max_heartrate) if hasattr(activity, 'max_heartrate') and activity.max_heartrate else None,
+            "kudos_count": int(activity.kudos_count) if hasattr(activity, 'kudos_count') else 0
+        }

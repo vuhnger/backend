@@ -6,17 +6,19 @@ Single user mode - stores one set of tokens and serves cached data.
 """
 import os
 import logging
+from datetime import datetime
 from fastapi import FastAPI, APIRouter, Depends, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session
+from sqlalchemy import desc, extract
 from stravalib.client import Client
 
 from apps.shared.database import get_db, Base, engine, check_db_connection
 from apps.shared.auth import get_api_key
 from apps.shared.oauth_state import generate_state, validate_state
 from apps.shared.errors import log_and_sanitize_error
-from apps.strava.models import StravaAuth, StravaStats
+from apps.strava.models import StravaAuth, StravaStats, StravaActivity
 from apps.strava.tasks import fetch_and_cache_stats
 
 logger = logging.getLogger(__name__)
@@ -217,6 +219,92 @@ def get_monthly_stats(db: Session = Depends(get_db)):
         )
 
     return stats.to_dict()
+
+
+@router.get("/stats/longest-run")
+def get_longest_run(year: int = None, db: Session = Depends(get_db)):
+    """
+    Get the longest run for a specific year (default: current year).
+    Query from full activity history.
+    """
+    if year is None:
+        year = datetime.now().year
+
+    longest_run = (
+        db.query(StravaActivity)
+        .filter(
+            StravaActivity.type == "Run",
+            extract('year', StravaActivity.start_date_local) == year
+        )
+        .order_by(desc(StravaActivity.distance))
+        .first()
+    )
+
+    if not longest_run:
+        raise HTTPException(
+            status_code=404,
+            detail=f"No runs found for year {year}. Try /strava/refresh-data"
+        )
+
+    return longest_run.to_dict()
+
+
+@router.get("/stats/longest-ride")
+def get_longest_ride(year: int = None, db: Session = Depends(get_db)):
+    """
+    Get the longest ride for a specific year (default: current year).
+    Query from full activity history.
+    """
+    if year is None:
+        year = datetime.now().year
+
+    longest_ride = (
+        db.query(StravaActivity)
+        .filter(
+            StravaActivity.type == "Ride",
+            extract('year', StravaActivity.start_date_local) == year
+        )
+        .order_by(desc(StravaActivity.distance))
+        .first()
+    )
+
+    if not longest_ride:
+        raise HTTPException(
+            status_code=404,
+            detail=f"No rides found for year {year}. Try /strava/refresh-data"
+        )
+
+    return longest_ride.to_dict()
+
+
+@router.get("/activities")
+def get_all_activities_endpoint(
+    limit: int = 100,
+    offset: int = 0,
+    year: int = None,
+    activity_type: str = None,
+    db: Session = Depends(get_db)
+):
+    """
+    Get all activities from history with pagination and filtering.
+    """
+    query = db.query(StravaActivity).order_by(desc(StravaActivity.start_date))
+
+    if year:
+        query = query.filter(extract('year', StravaActivity.start_date_local) == year)
+    
+    if activity_type:
+        query = query.filter(StravaActivity.type == activity_type)
+
+    total = query.count()
+    activities = query.offset(offset).limit(limit).all()
+
+    return {
+        "total": total,
+        "limit": limit,
+        "offset": offset,
+        "data": [a.to_dict() for a in activities]
+    }
 
 
 @router.post("/refresh-data")

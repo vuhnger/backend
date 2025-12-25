@@ -2,11 +2,12 @@
 Background tasks for fetching and caching Strava data
 """
 import logging
-from typing import Dict, Any
+from typing import Dict, Any, List
 from sqlalchemy.orm import Session
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 from apps.shared.database import SessionLocal
-from apps.strava.models import StravaStats
-from apps.strava.client import get_ytd_stats, get_recent_activities, get_monthly_stats
+from apps.strava.models import StravaStats, StravaActivity
+from apps.strava.client import get_ytd_stats, get_recent_activities, get_monthly_stats, get_all_activities
 from apps.shared.upsert import atomic_upsert_stats
 
 logger = logging.getLogger(__name__)
@@ -23,6 +24,10 @@ def fetch_and_cache_stats():
 
     try:
         logger.info("Fetching Strava data...")
+
+        # Sync all historic activities
+        sync_activities(db)
+        logger.info("Synced all activities to database")
 
         # Fetch YTD stats
         ytd_data = get_ytd_stats(db)
@@ -50,6 +55,56 @@ def fetch_and_cache_stats():
         raise
     finally:
         db.close()
+
+
+def sync_activities(db: Session):
+    """
+    Fetch all activities and upsert them into the database.
+    Uses efficient bulk upsert.
+    """
+    activities_gen = get_all_activities(db)
+    
+    count = 0
+    batch = []
+    BATCH_SIZE = 100
+
+    for activity_data in activities_gen:
+        batch.append(activity_data)
+        
+        if len(batch) >= BATCH_SIZE:
+            _bulk_upsert_activities(db, batch)
+            batch = []
+            logger.info(f"Synced {count + BATCH_SIZE} activities...")
+        
+        count += 1
+
+    if batch:
+        _bulk_upsert_activities(db, batch)
+    
+    logger.info(f"Total activities synced: {count}")
+
+
+def _bulk_upsert_activities(db: Session, activities: List[Dict[str, Any]]):
+    """
+    Helper to perform bulk upsert of activities
+    """
+    if not activities:
+        return
+
+    stmt = pg_insert(StravaActivity.__table__).values(activities)
+    
+    # Update all fields on conflict except id
+    update_dict = {
+        c.name: c for c in stmt.excluded 
+        if c.name != 'id'
+    }
+    
+    stmt = stmt.on_conflict_do_update(
+        index_elements=['id'],
+        set_=update_dict
+    )
+    
+    db.execute(stmt)
 
 
 def upsert_stats(db: Session, stats_type: str, data: Dict[str, Any], commit: bool = True) -> None:
