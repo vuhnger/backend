@@ -1,3 +1,4 @@
+
 # vuhnger/backend
 
 FastAPI backend for Strava activity tracking with OAuth, cached statistics, and encrypted token storage.
