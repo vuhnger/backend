@@ -9,7 +9,7 @@ import logging
 from datetime import datetime
 from fastapi import FastAPI, APIRouter, Depends, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import RedirectResponse
+from fastapi.responses import RedirectResponse, HTMLResponse
 from sqlalchemy.orm import Session
 from sqlalchemy import desc, extract
 from stravalib.client import Client
@@ -324,5 +324,80 @@ def refresh_data(api_key: str = Depends(get_api_key)):
         )
         raise HTTPException(status_code=500, detail=sanitized_msg)
 
+
+@app.get("/", response_class=HTMLResponse)
+def landing_page():
+    return """
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>Strava API Service</title>
+        <style>
+            body { font-family: system-ui, -apple-system, sans-serif; max-width: 800px; margin: 0 auto; padding: 2rem; line-height: 1.5; color: #333; }
+            h1 { color: #fc4c02; margin-bottom: 2rem; }
+            .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 1.5rem; }
+            .card { border: 1px solid #e1e4e8; padding: 1.5rem; border-radius: 8px; transition: all 0.2s; background: white; }
+            a.card { text-decoration: none; color: inherit; }
+            a.card:hover { transform: translateY(-3px); box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1); border-color: #fc4c02; }
+            h3 { margin-top: 0; color: #24292e; }
+            p { color: #586069; margin-bottom: 0; }
+            .status-ok { color: #28a745; font-weight: bold; }
+            .status-err { color: #cb2431; font-weight: bold; }
+            code { background: #f6f8fa; padding: 0.2em 0.4em; border-radius: 3px; font-size: 0.85em; }
+        </style>
+    </head>
+    <body>
+        <h1>🚴 Strava API Service</h1>
+        
+        <div class="grid">
+            <a href="/docs" class="card">
+                <h3>📚 Interactive Docs</h3>
+                <p>Swagger UI for testing endpoints</p>
+            </a>
+
+            <a href="/redoc" class="card">
+                <h3>📖 API Reference</h3>
+                <p>Detailed documentation (ReDoc)</p>
+            </a>
+
+            <a href="https://vuhnger.dev" class="card" target="_blank">
+                <h3>🎨 Frontend App</h3>
+                <p>Main dashboard website</p>
+            </a>
+
+            <div class="card">
+                <h3>🔌 System Status</h3>
+                <div id="health-check">Connecting...</div>
+            </div>
+        </div>
+
+        <div style="margin-top: 3rem; border-top: 1px solid #eee; padding-top: 1rem; color: #666; font-size: 0.9rem;">
+            <p><strong>Endpoints:</strong></p>
+            <ul style="list-style: none; padding-left: 0;">
+                <li><code>GET /strava/stats/ytd</code> - Year-to-date stats</li>
+                <li><code>GET /strava/stats/longest-run</code> - Longest run this year</li>
+                <li><code>GET /strava/stats/longest-ride</code> - Longest ride this year</li>
+                <li><code>GET /strava/activities</code> - Full activity history</li>
+            </ul>
+        </div>
+
+        <script>
+            fetch('/strava/health')
+                .then(r => r.json())
+                .then(data => {
+                    const el = document.getElementById('health-check');
+                    if(data.status === 'ok') {
+                        el.innerHTML = '<span class="status-ok">● Operational</span><br><small>DB Connected</small>';
+                    } else {
+                        el.innerHTML = '<span class="status-err">● Degradated</span><br><small>' + data.database + '</small>';
+                    }
+                })
+                .catch(err => {
+                    document.getElementById('health-check').innerHTML = '<span class="status-err">● Unreachable</span>';
+                });
+        </script>
+    </body>
+    </html>
+    """
 
 app.include_router(router)
