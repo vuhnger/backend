@@ -2,6 +2,7 @@
 Strava database models for OAuth tokens and cached statistics
 """
 from sqlalchemy import Column, Integer, BigInteger, String, DateTime, JSON, func
+from cryptography.fernet import InvalidToken
 from apps.shared.database import Base
 from apps.shared.encryption import encrypt_token, decrypt_token
 
@@ -31,7 +32,7 @@ class StravaAuth(Base):
         """
         try:
             return decrypt_token(self._access_token)
-        except Exception:
+        except (InvalidToken, ValueError, TypeError):
             # Fallback for legacy unencrypted tokens during migration
             return self._access_token
 
@@ -50,7 +51,7 @@ class StravaAuth(Base):
         """
         try:
             return decrypt_token(self._refresh_token)
-        except Exception:
+        except (InvalidToken, ValueError, TypeError):
             # Fallback for legacy unencrypted tokens during migration
             return self._refresh_token
 
