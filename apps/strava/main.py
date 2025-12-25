@@ -130,15 +130,17 @@ def oauth_callback(code: str, state: str, db: Session = Depends(get_db)):
 
         # Store in database (single user, id=1) using atomic upsert
         from apps.shared.upsert import atomic_upsert_auth
+        from apps.shared.encryption import encrypt_token
 
+        # Encrypt tokens before storing (use actual column names, not properties)
         atomic_upsert_auth(
             db=db,
             model=StravaAuth,
             auth_data={
                 'id': 1,
                 'athlete_id': athlete_id,
-                'access_token': access_token,
-                'refresh_token': refresh_token,
+                '_access_token': encrypt_token(access_token),
+                '_refresh_token': encrypt_token(refresh_token),
                 'expires_at': expires_at
             }
         )
