@@ -26,7 +26,9 @@ Base.metadata.create_all(bind=engine)
 app = FastAPI(
     title="WakaTime Service",
     version="1.0.0",
-    description="WakaTime OAuth integration and cached stats"
+    description="WakaTime OAuth integration and cached stats",
+    docs_url="/wakatime/docs",
+    openapi_url="/wakatime/openapi.json"
 )
 
 # CORS

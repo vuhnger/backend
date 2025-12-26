@@ -13,7 +13,9 @@ logger = logging.getLogger(__name__)
 app = FastAPI(
     title="n8n Health Check Service",
     version="1.0.0",
-    description="Health check proxy for n8n automation platform"
+    description="Health check proxy for n8n automation platform",
+    docs_url="/n8n/docs",
+    openapi_url="/n8n/openapi.json"
 )
 
 # CORS Configuration
