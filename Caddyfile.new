@@ -1,0 +1,15 @@
+n8n.vuhnger.dev {
+    reverse_proxy 127.0.0.1:5678
+}
+
+api.vuhnger.dev {
+    handle /n8n/* {
+        reverse_proxy 127.0.0.1:5004
+    }
+
+    handle /wakatime/* {
+        reverse_proxy 127.0.0.1:5002
+    }
+    
+    reverse_proxy 127.0.0.1:5001
+}
