@@ -134,3 +134,4 @@ test_*.py
 benchmark_*.py
 
 refresh.sh
+n8n-workflows/*
