@@ -23,14 +23,31 @@ from apps.strava.tasks import fetch_and_cache_stats
 
 logger = logging.getLogger(__name__)
 
+from fastapi.openapi.docs import get_swagger_ui_html
+
 # Create database tables
 Base.metadata.create_all(bind=engine)
 
 app = FastAPI(
     title="Strava Service",
     version="1.0.0",
-    description="Strava OAuth integration with cached activity statistics"
+    description="Strava OAuth integration with cached activity statistics",
+    docs_url=None,  # Disable default docs
 )
+
+@app.get("/docs", include_in_schema=False)
+async def custom_swagger_ui_html():
+    return get_swagger_ui_html(
+        openapi_url="/openapi.json",
+        title="API Docs",
+        swagger_ui_parameters={
+            "urls": [
+                {"url": "/openapi.json", "name": "Strava API"},
+                {"url": "/wakatime/openapi.json", "name": "WakaTime API"},
+                {"url": "/n8n/openapi.json", "name": "N8N API"},
+            ]
+        }
+    )
 
 # CORS Configuration
 origins = [
