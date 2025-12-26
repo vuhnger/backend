@@ -100,18 +100,16 @@ def oauth_callback(code: str, state: str, db: Session = Depends(get_db)):
     
     try:
         response = requests.post(token_url, data=data)
-        
-        # Debugging: Log response if not success or if parsing fails
-        if response.status_code != 200:
-            logger.error(f"WakaTime Token Error: Status={response.status_code}, Body={response.text}")
-            
         response.raise_for_status()
         
         try:
             token_data = response.json()
-        except Exception:
-            logger.error(f"WakaTime JSON Parse Error. Status={response.status_code}, Content={response.text}")
-            raise
+        except ValueError:
+            # WakaTime sometimes returns application/x-www-form-urlencoded body
+            from urllib.parse import parse_qs
+            parsed = parse_qs(response.text)
+            # parse_qs returns lists, we need single values
+            token_data = {k: v[0] for k, v in parsed.items()}
 
         access_token = token_data["access_token"]
         refresh_token = token_data["refresh_token"]
