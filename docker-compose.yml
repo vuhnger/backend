@@ -80,6 +80,26 @@ services:
     networks:
       - backend
 
+  projects-api:
+    build: .
+    command: ["uvicorn", "apps.projects.main:app", "--host", "0.0.0.0", "--port", "5005"]
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:5005:5005"
+    volumes:
+      - /home/rocky/uploads:/home/rocky/uploads
+    environment:
+      DATABASE_URL: postgresql+psycopg2://${POSTGRES_USER:-backend_user}:${POSTGRES_PASSWORD:-changeme}@db:5432/${POSTGRES_DB:-backend_db}
+      ENVIRONMENT: ${ENVIRONMENT:-development}
+      INTERNAL_API_KEY: ${INTERNAL_API_KEY}
+      UPLOAD_DIR: /home/rocky/uploads/projects
+      UPLOAD_BASE_URL: https://api.vuhnger.dev/uploads/projects
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - backend
+
 networks:
   backend:
 
