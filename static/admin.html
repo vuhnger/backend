@@ -541,10 +541,6 @@
             slugInput: document.getElementById('slug'),
         };
 
-        // Initialize
-        elements.apiKeyInput.value = apiKey;
-        if (apiKey) connect();
-
         // Event listeners
         elements.connectBtn.addEventListener('click', connect);
         elements.newProjectBtn.addEventListener('click', () => openEditor());
