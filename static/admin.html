@@ -517,7 +517,7 @@
 
     <script>
         const API_BASE = window.location.origin;
-        let apiKey = localStorage.getItem('projectsApiKey') || '';
+        let apiKey = '';
         let projects = [];
 
         // DOM elements
@@ -561,7 +561,6 @@
         // API Key handling
         async function connect() {
             apiKey = elements.apiKeyInput.value;
-            localStorage.setItem('projectsApiKey', apiKey);
 
             try {
                 await loadProjects();
