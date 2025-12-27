@@ -67,3 +67,6 @@ def fetch_and_cache_wakatime_stats():
         raise
     finally:
         db.close()
+
+if __name__ == "__main__":
+    fetch_and_cache_wakatime_stats()
