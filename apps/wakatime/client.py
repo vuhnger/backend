@@ -52,6 +52,45 @@ def get_today_summary(db: Session):
         logger.error(f"Failed to fetch WakaTime today summary: {e}")
         raise
 
+def get_weekly_summary(db: Session):
+    """
+    Fetch summary for the last 7 days using the summaries endpoint.
+    This is more accurate and up-to-date than the stats endpoint.
+    """
+    access_token = get_valid_token(db)
+    
+    from datetime import timedelta
+    end_date = date.today()
+    start_date = end_date - timedelta(days=6)
+    
+    url = f"{BASE_URL}/users/current/summaries"
+    headers = {"Authorization": f"Bearer {access_token}"}
+    params = {
+        "start": start_date.strftime("%Y-%m-%d"),
+        "end": end_date.strftime("%Y-%m-%d")
+    }
+    
+    try:
+        response = requests.get(url, headers=headers, params=params, timeout=10)
+        response.raise_for_status()
+        data = response.json()
+        
+        # Calculate totals from the daily summaries
+        summaries = data.get("data", [])
+        total_seconds = sum(s.get("grand_total", {}).get("total_seconds", 0) for s in summaries)
+        
+        hours = int(total_seconds // 3600)
+        minutes = int((total_seconds % 3600) // 60)
+        
+        return {
+            "total_seconds": total_seconds,
+            "human_readable_total": f"{hours} hrs {minutes} mins",
+            "daily_summaries": summaries
+        }
+    except requests.RequestException as e:
+        logger.error(f"Failed to fetch WakaTime weekly summary: {e}")
+        raise
+
 def get_all_time_stats(db: Session):
     """
     Fetch all time stats.

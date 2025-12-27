@@ -5,7 +5,7 @@ import logging
 from sqlalchemy.orm import Session
 from apps.shared.database import SessionLocal
 from apps.wakatime.models import WakaTimeStats, WakaTimeAuth
-from apps.wakatime.client import get_stats, get_today_summary
+from apps.wakatime.client import get_stats, get_today_summary, get_weekly_summary
 from apps.shared.upsert import atomic_upsert_stats
 
 logger = logging.getLogger(__name__)
@@ -36,8 +36,8 @@ def fetch_and_cache_wakatime_stats():
         )
         logger.info("Cached 'today' stats")
 
-        # 2. Fetch Last 7 Days
-        last_7_days = get_stats(db, "last_7_days")
+        # 2. Fetch Last 7 Days (using accurate summaries)
+        last_7_days = get_weekly_summary(db)
         atomic_upsert_stats(
             db=db,
             model=WakaTimeStats,
@@ -45,7 +45,7 @@ def fetch_and_cache_wakatime_stats():
             unique_value='last_7_days',
             update_data={'data': last_7_days}
         )
-        logger.info("Cached 'last_7_days' stats")
+        logger.info("Cached 'last_7_days' summary (accurate)")
 
         # 3. Fetch All Time
         all_time = get_stats(db, "all_time")
