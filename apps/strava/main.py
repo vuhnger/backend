@@ -32,23 +32,9 @@ app = FastAPI(
     title="Strava Service",
     version="1.0.0",
     description="Strava OAuth integration with cached activity statistics",
-    docs_url=None,  # Disable default docs
+    docs_url="/strava/docs",
+    openapi_url="/strava/openapi.json"
 )
-
-@app.get("/docs", include_in_schema=False)
-async def custom_swagger_ui_html():
-    return get_swagger_ui_html(
-        openapi_url="/openapi.json",
-        title="API Docs",
-        swagger_ui_parameters={
-            "urls": [
-                {"url": "/openapi.json", "name": "Strava API"},
-                {"url": "/wakatime/openapi.json", "name": "WakaTime API"},
-                {"url": "/n8n/openapi.json", "name": "N8N API"},
-                {"url": "/projects/openapi.json", "name": "Projects API"},
-            ]
-        }
-    )
 
 # Setup CORS from shared configuration
 setup_cors(app)
