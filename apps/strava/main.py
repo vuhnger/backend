@@ -38,13 +38,15 @@ app = FastAPI(
 @app.get("/docs", include_in_schema=False)
 async def custom_swagger_ui_html():
     return get_swagger_ui_html(
-        openapi_url="/openapi.json",
+        openapi_url="/openapi.json", # Standard
         title="API Docs",
         swagger_ui_parameters={
+            "layout": "StandaloneLayout",
             "urls": [
                 {"url": "/openapi.json", "name": "Strava API"},
                 {"url": "/wakatime/openapi.json", "name": "WakaTime API"},
                 {"url": "/n8n/openapi.json", "name": "N8N API"},
+                {"url": "/projects/openapi.json", "name": "Projects API"},
             ]
         }
     )
