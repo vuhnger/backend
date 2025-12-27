@@ -5,12 +5,12 @@ import os
 import logging
 import requests
 from fastapi import FastAPI, APIRouter, Depends, HTTPException
-from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session
 
 from apps.shared.database import get_db, Base, engine, check_db_connection
 from apps.shared.auth import get_api_key
+from apps.shared.cors import setup_cors
 from apps.shared.oauth_state import generate_state, validate_state
 from apps.shared.errors import log_and_sanitize_error
 from apps.wakatime.models import WakaTimeAuth, WakaTimeStats
@@ -31,26 +31,8 @@ app = FastAPI(
     openapi_url="/wakatime/openapi.json"
 )
 
-# CORS
-origins = [
-    "https://vuhnger.dev",
-    "https://www.vuhnger.dev",
-    "http://localhost:5173",
-    "http://localhost:3000",
-]
-frontend_url = os.getenv("FRONTEND_URL")
-if frontend_url:
-    clean_url = frontend_url.rstrip("/")
-    if clean_url not in origins:
-        origins.append(clean_url)
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=origins,
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+# Setup CORS from shared configuration
+setup_cors(app)
 
 router = APIRouter(prefix="/wakatime")
 

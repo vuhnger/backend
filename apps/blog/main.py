@@ -1,22 +1,11 @@
 from fastapi import FastAPI, APIRouter
-from fastapi.middleware.cors import CORSMiddleware
+
+from apps.shared.cors import setup_cors
 
 app = FastAPI(title="Blog Service", version="1.0.0")
 
-# CORS Configuration
-origins = [
-    "https://vuhnger.dev",
-    "https://vuhnger.github.io",
-    "http://localhost:5173",
-]
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=origins,
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+# Setup CORS from shared configuration
+setup_cors(app)
 
 # Router setup
 router = APIRouter(prefix="/blog")

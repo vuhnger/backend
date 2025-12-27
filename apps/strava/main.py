@@ -8,7 +8,6 @@ import os
 import logging
 from datetime import datetime
 from fastapi import FastAPI, APIRouter, Depends, HTTPException
-from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import RedirectResponse, FileResponse
 from sqlalchemy.orm import Session
 from sqlalchemy import desc, extract
@@ -16,6 +15,7 @@ from stravalib.client import Client
 
 from apps.shared.database import get_db, Base, engine, check_db_connection
 from apps.shared.auth import get_api_key
+from apps.shared.cors import setup_cors
 from apps.shared.oauth_state import generate_state, validate_state
 from apps.shared.errors import log_and_sanitize_error
 from apps.strava.models import StravaAuth, StravaStats, StravaActivity
@@ -49,30 +49,8 @@ async def custom_swagger_ui_html():
         }
     )
 
-# CORS Configuration
-origins = [
-    "https://vuhnger.dev",
-    "https://www.vuhnger.dev",
-    "https://vuhnger.github.io",
-    "http://localhost:5173",
-    "http://localhost:3000",
-    "https://localhost:3000",
-]
-
-# Add FRONTEND_URL from env if set (prevents missing origin issues)
-frontend_url = os.getenv("FRONTEND_URL")
-if frontend_url:
-    clean_url = frontend_url.rstrip("/")
-    if clean_url not in origins:
-        origins.append(clean_url)
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=origins,
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+# Setup CORS from shared configuration
+setup_cors(app)
 
 # Router setup
 router = APIRouter(prefix="/strava")

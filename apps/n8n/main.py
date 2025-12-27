@@ -6,7 +6,8 @@ Provides a health check endpoint that verifies n8n.vuhnger.dev is operational.
 import logging
 import httpx
 from fastapi import FastAPI, APIRouter
-from fastapi.middleware.cors import CORSMiddleware
+
+from apps.shared.cors import setup_cors
 
 logger = logging.getLogger(__name__)
 
@@ -18,21 +19,8 @@ app = FastAPI(
     openapi_url="/n8n/openapi.json"
 )
 
-# CORS Configuration
-origins = [
-    "https://vuhnger.dev",
-    "https://www.vuhnger.dev",
-    "http://localhost:5173",
-    "http://localhost:3000",
-]
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=origins,
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+# Setup CORS from shared configuration
+setup_cors(app)
 
 router = APIRouter(prefix="/n8n", tags=["n8n"])
 
