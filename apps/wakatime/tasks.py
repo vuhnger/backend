@@ -27,6 +27,7 @@ def fetch_and_cache_wakatime_stats():
 
         # 1. Fetch Today's Summary
         today_data = get_today_summary(db)
+        today_data["range"] = "today" # Force string for frontend label logic
         atomic_upsert_stats(
             db=db,
             model=WakaTimeStats,
@@ -38,6 +39,7 @@ def fetch_and_cache_wakatime_stats():
 
         # 2. Fetch Last 7 Days (using accurate summaries)
         last_7_days = get_weekly_summary(db)
+        # range: last_7_days is already set in get_weekly_summary
         atomic_upsert_stats(
             db=db,
             model=WakaTimeStats,
@@ -49,6 +51,7 @@ def fetch_and_cache_wakatime_stats():
 
         # 3. Fetch All Time
         all_time = get_stats(db, "all_time")
+        all_time["range"] = "all_time" # Force string for frontend label logic
         atomic_upsert_stats(
             db=db,
             model=WakaTimeStats,
