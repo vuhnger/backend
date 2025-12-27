@@ -85,7 +85,8 @@ def get_weekly_summary(db: Session):
         return {
             "total_seconds": total_seconds,
             "human_readable_total": f"{hours} hrs {minutes} mins",
-            "daily_summaries": summaries
+            "daily_summaries": summaries,
+            "range": "last_7_days"
         }
     except requests.RequestException as e:
         logger.error(f"Failed to fetch WakaTime weekly summary: {e}")
