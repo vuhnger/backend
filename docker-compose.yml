@@ -1,0 +1,107 @@
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-backend_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-changeme}
+      POSTGRES_DB: ${POSTGRES_DB:-backend_db}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - backend
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-backend_user}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  strava-api:
+    build: .
+    command: ["uvicorn", "apps.strava.main:app", "--host", "0.0.0.0", "--port", "5001"]
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:5001:5001"
+    environment:
+      # Database connection
+      DATABASE_URL: postgresql+psycopg2://${POSTGRES_USER:-backend_user}:${POSTGRES_PASSWORD:-changeme}@db:5432/${POSTGRES_DB:-backend_db}
+
+      # Environment mode
+      ENVIRONMENT: ${ENVIRONMENT:-development}
+
+      # Security keys
+      INTERNAL_API_KEY: ${INTERNAL_API_KEY}
+      STATE_SECRET: ${STATE_SECRET}
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY}
+
+      # Strava OAuth
+      STRAVA_CLIENT_ID: ${STRAVA_CLIENT_ID}
+      STRAVA_CLIENT_SECRET: ${STRAVA_CLIENT_SECRET}
+      STRAVA_REDIRECT_URI: ${STRAVA_REDIRECT_URI}
+
+      # Frontend integration
+      FRONTEND_URL: ${FRONTEND_URL:-https://vuhnger.dev}
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - backend
+
+  n8n-api:
+    build: .
+    command: ["uvicorn", "apps.n8n.main:app", "--host", "0.0.0.0", "--port", "5004"]
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:5004:5004"
+    environment:
+      INTERNAL_API_KEY: ${INTERNAL_API_KEY}
+    networks:
+      - backend
+
+  wakatime-api:
+    build: .
+    command: ["uvicorn", "apps.wakatime.main:app", "--host", "0.0.0.0", "--port", "5002"]
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:5002:5002"
+    environment:
+      DATABASE_URL: postgresql+psycopg2://${POSTGRES_USER:-backend_user}:${POSTGRES_PASSWORD:-changeme}@db:5432/${POSTGRES_DB:-backend_db}
+      ENVIRONMENT: ${ENVIRONMENT:-development}
+      INTERNAL_API_KEY: ${INTERNAL_API_KEY}
+      STATE_SECRET: ${STATE_SECRET}
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY}
+      WAKATIME_CLIENT_ID: ${WAKATIME_CLIENT_ID}
+      WAKATIME_CLIENT_SECRET: ${WAKATIME_CLIENT_SECRET}
+      WAKATIME_REDIRECT_URI: ${WAKATIME_REDIRECT_URI}
+      FRONTEND_URL: ${FRONTEND_URL:-https://vuhnger.dev}
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - backend
+
+  projects-api:
+    build: .
+    command: ["uvicorn", "apps.projects.main:app", "--host", "0.0.0.0", "--port", "5005"]
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:5005:5005"
+    volumes:
+      - /home/rocky/uploads:/home/rocky/uploads
+    environment:
+      DATABASE_URL: postgresql+psycopg2://${POSTGRES_USER:-backend_user}:${POSTGRES_PASSWORD:-changeme}@db:5432/${POSTGRES_DB:-backend_db}
+      ENVIRONMENT: ${ENVIRONMENT:-development}
+      INTERNAL_API_KEY: ${INTERNAL_API_KEY}
+      UPLOAD_DIR: /home/rocky/uploads/projects
+      UPLOAD_BASE_URL: https://api.vuhnger.dev/uploads/projects
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - backend
+
+networks:
+  backend:
+
+volumes:
+  postgres_data:

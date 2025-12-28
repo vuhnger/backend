@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Victor Uhnger | API-tjenester</title>
+    <style>
+        :root { --accent: #000; --bg: #fff; --text: #000; --card-bg: #fff; --secondary: #666; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            -webkit-font-smoothing: antialiased;
+        }
+        .container { text-align: center; max-width: 600px; padding: 2rem; width: 100%; box-sizing: border-box; }
+        h1 { font-size: 2.5rem; font-weight: 800; letter-spacing: -0.03em; margin-bottom: 0.5rem; color: #000; }
+        p.subtitle { color: var(--secondary); font-size: 1.1rem; margin-bottom: 3rem; line-height: 1.6; }
+        
+        .services-grid {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+            margin-bottom: 3rem;
+            width: 100%;
+        }
+        
+        .service-card {
+            background: var(--card-bg);
+            border: 2px solid #000;
+            border-radius: 12px;
+            padding: 1.5rem;
+            text-align: left;
+            transition: transform 0.2s, border-color 0.2s;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .service-card:hover { transform: translateY(-2px); border-color: #666; }
+
+        .service-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem; }
+        .service-name { font-weight: 600; font-size: 1.1rem; }
+        .service-status { font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; padding: 2px 8px; border-radius: 99px; background: #f0f0f0; color: #666; }
+
+        .service-status.online { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+        .service-status.offline { background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+
+        .service-meta { font-size: 0.85rem; color: var(--secondary); margin-bottom: 0.5rem; }
+        .service-url { font-size: 0.8rem; color: #0066cc; font-family: 'Courier New', monospace; background: #f5f5f5; padding: 4px 8px; border-radius: 4px; display: inline-block; margin-top: 0.5rem; }
+
+        .links { display: flex; gap: 1rem; justify-content: center; flex-wrap: wrap; }
+        .btn {
+            padding: 0.8rem 1.6rem;
+            border-radius: 8px;
+            font-weight: 600;
+            text-decoration: none;
+            transition: all 0.2s;
+            font-size: 0.95rem;
+        }
+        .btn-primary { background: #000; color: #fff; }
+        .btn-primary:hover { background: #333; }
+        .btn-secondary { background: #fff; color: #000; border: 2px solid #000; }
+        .btn-secondary:hover { background: #f0f0f0; }
+
+        footer { margin-top: 4rem; color: #999; font-size: 0.9rem; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Victor Uhnger</h1>
+        <p class="subtitle">Velkommen til mikrotjenestene mine!</p>
+        
+        <div class="services-grid">
+            <!-- Strava -->
+            <div class="service-card" id="card-strava">
+                <div class="service-header">
+                    <span class="service-name">🏃 Strava API</span>
+                    <span class="service-status" id="status-strava">Sjekker...</span>
+                </div>
+                <div class="service-meta" id="meta-strava">Aktivitetssporing & Statistikk</div>
+                <div class="service-url">https://api.vuhnger.dev/strava</div>
+            </div>
+
+            <!-- Wakatime -->
+            <div class="service-card" id="card-wakatime">
+                <div class="service-header">
+                    <span class="service-name">👨‍💻 Wakatime API</span>
+                    <span class="service-status" id="status-wakatime">Sjekker...</span>
+                </div>
+                <div class="service-meta" id="meta-wakatime">Kodingsstatistikk</div>
+                <div class="service-url">https://api.vuhnger.dev/wakatime</div>
+            </div>
+
+            <!-- n8n -->
+            <div class="service-card" id="card-n8n">
+                <div class="service-header">
+                    <span class="service-name">⚙️ n8n instansen</span>
+                    <span class="service-status" id="status-n8n">Sjekker...</span>
+                </div>
+                <div class="service-meta" id="meta-n8n">Automatiserer arbeidsflyter og overvåker, feilsøker og reparerer økosystemet med KI.</div>
+                <div class="service-url">https://n8n.vuhnger.dev</div>
+            </div>
+        </div>
+
+        <div class="links">
+            <a href="/strava/docs" class="btn btn-primary">Strava Docs</a>
+            <a href="/wakatime/docs" class="btn btn-primary">Wakatime Docs</a>
+            <a href="/n8n/docs" class="btn btn-primary">N8N Docs</a>
+            <a href="https://vuhnger.dev" class="btn btn-secondary" target="_blank">Nettside</a>
+        </div>
+
+        <footer>
+            &copy; 2025 Victor Uhnger
+        </footer>
+    </div>
+
+    <script>
+        const services = [
+            { id: 'strava', url: '/strava/health' },
+            { id: 'wakatime', url: '/wakatime/health' },
+            { id: 'n8n', url: '/n8n/health' }
+        ];
+
+        services.forEach(service => {
+            fetch(service.url)
+                .then(r => {
+                    if (r.ok) return r.json();
+                    throw new Error('Failed');
+                })
+                .then(data => {
+                    const statusEl = document.getElementById(`status-${service.id}`);
+                    if (data.status === 'ok') {
+                        statusEl.innerText = 'TILGJENGELIG';
+                        statusEl.classList.add('online');
+
+                        // Optional: Add DB info if available
+                        if (data.database) {
+                            document.getElementById(`meta-${service.id}`).innerText += ` • DB: ${data.database}`;
+                        }
+                    } else {
+                        statusEl.innerText = 'DEGRADERT';
+                        statusEl.classList.add('offline');
+                    }
+                })
+                .catch(() => {
+                    const statusEl = document.getElementById(`status-${service.id}`);
+                    statusEl.innerText = 'NEDE';
+                    statusEl.classList.add('offline');
+                });
+        });
+    </script>
+</body>
+</html>

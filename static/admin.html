@@ -1,0 +1,865 @@
+<!DOCTYPE html>
+<html lang="no">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Projects Admin</title>
+    <style>
+        :root {
+            --bg: #0a0a0a;
+            --surface: #141414;
+            --surface-hover: #1f1f1f;
+            --border: #2a2a2a;
+            --text: #e5e5e5;
+            --text-muted: #888;
+            --accent: #3b82f6;
+            --accent-hover: #2563eb;
+            --success: #22c55e;
+            --danger: #ef4444;
+            --warning: #f59e0b;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+            line-height: 1.5;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 2rem;
+            padding-bottom: 1rem;
+            border-bottom: 1px solid var(--border);
+        }
+
+        h1 {
+            font-size: 1.5rem;
+            font-weight: 600;
+        }
+
+        .api-key-form {
+            display: flex;
+            gap: 0.5rem;
+            align-items: center;
+        }
+
+        input, textarea, select {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            color: var(--text);
+            padding: 0.5rem 0.75rem;
+            border-radius: 6px;
+            font-size: 0.875rem;
+            transition: border-color 0.2s;
+        }
+
+        input:focus, textarea:focus, select:focus {
+            outline: none;
+            border-color: var(--accent);
+        }
+
+        input[type="password"] {
+            width: 200px;
+        }
+
+        button {
+            background: var(--accent);
+            color: white;
+            border: none;
+            padding: 0.5rem 1rem;
+            border-radius: 6px;
+            font-size: 0.875rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        button:hover {
+            background: var(--accent-hover);
+        }
+
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .btn-secondary {
+            background: var(--surface);
+            border: 1px solid var(--border);
+        }
+
+        .btn-secondary:hover {
+            background: var(--surface-hover);
+        }
+
+        .btn-danger {
+            background: var(--danger);
+        }
+
+        .btn-danger:hover {
+            background: #dc2626;
+        }
+
+        .btn-success {
+            background: var(--success);
+        }
+
+        .status {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.25rem;
+            font-size: 0.75rem;
+            padding: 0.25rem 0.5rem;
+            border-radius: 4px;
+            background: var(--surface);
+        }
+
+        .status.connected {
+            color: var(--success);
+        }
+
+        .status.disconnected {
+            color: var(--danger);
+        }
+
+        .projects-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1rem;
+        }
+
+        .project-list {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+
+        .project-item {
+            display: grid;
+            grid-template-columns: 60px 1fr auto auto auto;
+            gap: 1rem;
+            align-items: center;
+            padding: 1rem;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            transition: border-color 0.2s;
+        }
+
+        .project-item:hover {
+            border-color: var(--accent);
+        }
+
+        .project-thumb {
+            width: 60px;
+            height: 40px;
+            object-fit: cover;
+            border-radius: 4px;
+            background: var(--bg);
+        }
+
+        .project-info {
+            min-width: 0;
+        }
+
+        .project-title {
+            font-weight: 500;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .project-slug {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            font-family: monospace;
+        }
+
+        .badge {
+            font-size: 0.7rem;
+            padding: 0.2rem 0.5rem;
+            border-radius: 4px;
+            font-weight: 500;
+        }
+
+        .badge.published {
+            background: rgba(34, 197, 94, 0.2);
+            color: var(--success);
+        }
+
+        .badge.draft {
+            background: rgba(245, 158, 11, 0.2);
+            color: var(--warning);
+        }
+
+        .badge.featured {
+            background: rgba(59, 130, 246, 0.2);
+            color: var(--accent);
+        }
+
+        .project-actions {
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        .project-actions button {
+            padding: 0.4rem 0.6rem;
+            font-size: 0.75rem;
+        }
+
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.8);
+            z-index: 100;
+            overflow-y: auto;
+        }
+
+        .modal-overlay.active {
+            display: flex;
+            justify-content: center;
+            padding: 2rem;
+        }
+
+        .modal {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            width: 100%;
+            max-width: 700px;
+            height: fit-content;
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 1rem 1.5rem;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .modal-header h2 {
+            font-size: 1.1rem;
+            font-weight: 600;
+        }
+
+        .modal-close {
+            background: none;
+            border: none;
+            color: var(--text-muted);
+            font-size: 1.5rem;
+            cursor: pointer;
+            padding: 0;
+            line-height: 1;
+        }
+
+        .modal-close:hover {
+            color: var(--text);
+        }
+
+        .modal-body {
+            padding: 1.5rem;
+        }
+
+        .form-group {
+            margin-bottom: 1rem;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-size: 0.875rem;
+            font-weight: 500;
+        }
+
+        .form-group input,
+        .form-group textarea,
+        .form-group select {
+            width: 100%;
+        }
+
+        .form-group textarea {
+            min-height: 100px;
+            resize: vertical;
+        }
+
+        .form-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1rem;
+        }
+
+        .form-check {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .form-check input {
+            width: auto;
+        }
+
+        .form-hint {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            margin-top: 0.25rem;
+        }
+
+        .image-upload {
+            border: 2px dashed var(--border);
+            border-radius: 8px;
+            padding: 2rem;
+            text-align: center;
+            cursor: pointer;
+            transition: border-color 0.2s;
+        }
+
+        .image-upload:hover {
+            border-color: var(--accent);
+        }
+
+        .image-upload.dragover {
+            border-color: var(--accent);
+            background: rgba(59, 130, 246, 0.1);
+        }
+
+        .image-upload input {
+            display: none;
+        }
+
+        .image-preview {
+            max-width: 100%;
+            max-height: 200px;
+            margin-top: 1rem;
+            border-radius: 6px;
+        }
+
+        .modal-footer {
+            display: flex;
+            justify-content: flex-end;
+            gap: 0.5rem;
+            padding: 1rem 1.5rem;
+            border-top: 1px solid var(--border);
+        }
+
+        .toast-container {
+            position: fixed;
+            bottom: 1rem;
+            right: 1rem;
+            z-index: 200;
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+
+        .toast {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            padding: 0.75rem 1rem;
+            border-radius: 6px;
+            animation: slideIn 0.2s ease;
+        }
+
+        .toast.success {
+            border-color: var(--success);
+        }
+
+        .toast.error {
+            border-color: var(--danger);
+        }
+
+        @keyframes slideIn {
+            from {
+                transform: translateX(100%);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 3rem;
+            color: var(--text-muted);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Projects Admin</h1>
+            <div class="api-key-form">
+                <input type="password" id="apiKey" placeholder="API Key" />
+                <button id="connectBtn">Connect</button>
+                <span id="connectionStatus" class="status disconnected">Not connected</span>
+            </div>
+        </header>
+
+        <main>
+            <div class="projects-header">
+                <h2>Projects</h2>
+                <button id="newProjectBtn">+ New Project</button>
+            </div>
+
+            <div id="projectList" class="project-list">
+                <div class="empty-state">Enter API key to load projects</div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Editor Modal -->
+    <div id="editorModal" class="modal-overlay">
+        <div class="modal">
+            <div class="modal-header">
+                <h2 id="editorTitle">New Project</h2>
+                <button class="modal-close" id="closeModalBtn">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form id="projectForm">
+                    <input type="hidden" id="editingSlug" />
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="title">Title *</label>
+                            <input type="text" id="title" required />
+                        </div>
+                        <div class="form-group">
+                            <label for="slug">Slug *</label>
+                            <input type="text" id="slug" required pattern="^[a-z0-9-]+$" />
+                            <div class="form-hint">URL-friendly identifier (lowercase, hyphens)</div>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="description">Description</label>
+                        <textarea id="description" rows="2"></textarea>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="content">Content (Markdown)</label>
+                        <textarea id="content" rows="4"></textarea>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Image</label>
+                        <div class="image-upload" id="imageUpload">
+                            <div>Click or drag image here</div>
+                            <input type="file" id="imageFile" accept="image/*" />
+                            <img id="imagePreview" class="image-preview" style="display: none;" />
+                        </div>
+                        <input type="hidden" id="image_url" />
+                    </div>
+
+                    <div class="form-group">
+                        <label for="technologies">Technologies</label>
+                        <input type="text" id="technologies" placeholder="React, Python, PostgreSQL" />
+                        <div class="form-hint">Comma-separated list</div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="link_github">GitHub URL</label>
+                            <input type="url" id="link_github" placeholder="https://github.com/..." />
+                        </div>
+                        <div class="form-group">
+                            <label for="link_live">Live URL</label>
+                            <input type="url" id="link_live" placeholder="https://..." />
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="order">Order</label>
+                            <input type="number" id="order" value="0" min="0" />
+                        </div>
+                        <div class="form-group" style="display: flex; gap: 1.5rem; align-items: flex-end; padding-bottom: 0.5rem;">
+                            <label class="form-check">
+                                <input type="checkbox" id="published" />
+                                Published
+                            </label>
+                            <label class="form-check">
+                                <input type="checkbox" id="featured" />
+                                Featured
+                            </label>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-secondary" id="cancelBtn">Cancel</button>
+                <button class="btn-success" id="saveBtn">Save</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Container -->
+    <div id="toastContainer" class="toast-container"></div>
+
+    <script>
+        const API_BASE = window.location.origin;
+        let apiKey = '';
+        let projects = [];
+
+        // DOM elements
+        const elements = {
+            apiKeyInput: document.getElementById('apiKey'),
+            connectBtn: document.getElementById('connectBtn'),
+            connectionStatus: document.getElementById('connectionStatus'),
+            newProjectBtn: document.getElementById('newProjectBtn'),
+            projectList: document.getElementById('projectList'),
+            editorModal: document.getElementById('editorModal'),
+            editorTitle: document.getElementById('editorTitle'),
+            closeModalBtn: document.getElementById('closeModalBtn'),
+            cancelBtn: document.getElementById('cancelBtn'),
+            saveBtn: document.getElementById('saveBtn'),
+            projectForm: document.getElementById('projectForm'),
+            imageUpload: document.getElementById('imageUpload'),
+            imageFile: document.getElementById('imageFile'),
+            imagePreview: document.getElementById('imagePreview'),
+            toastContainer: document.getElementById('toastContainer'),
+            titleInput: document.getElementById('title'),
+            slugInput: document.getElementById('slug'),
+        };
+
+        // Event listeners
+        elements.connectBtn.addEventListener('click', connect);
+        elements.newProjectBtn.addEventListener('click', () => openEditor());
+        elements.closeModalBtn.addEventListener('click', closeEditor);
+        elements.cancelBtn.addEventListener('click', closeEditor);
+        elements.saveBtn.addEventListener('click', saveProject);
+        elements.imageUpload.addEventListener('click', () => elements.imageFile.click());
+        elements.imageUpload.addEventListener('dragover', handleDragOver);
+        elements.imageUpload.addEventListener('dragleave', handleDragLeave);
+        elements.imageUpload.addEventListener('drop', handleDrop);
+        elements.imageFile.addEventListener('change', handleFileSelect);
+        elements.titleInput.addEventListener('input', autoGenerateSlug);
+
+        // API Key handling
+        async function connect() {
+            apiKey = elements.apiKeyInput.value;
+
+            try {
+                await loadProjects();
+                elements.connectionStatus.textContent = 'Connected';
+                elements.connectionStatus.className = 'status connected';
+                toast('Connected successfully', 'success');
+            } catch (e) {
+                elements.connectionStatus.textContent = 'Failed';
+                elements.connectionStatus.className = 'status disconnected';
+                toast('Connection failed: ' + e.message, 'error');
+            }
+        }
+
+        // API helpers
+        async function api(endpoint, options = {}) {
+            const res = await fetch(API_BASE + '/projects' + endpoint, {
+                ...options,
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-API-Key': apiKey,
+                    ...options.headers,
+                },
+            });
+
+            if (!res.ok) {
+                const err = await res.json().catch(() => ({ detail: res.statusText }));
+                throw new Error(err.detail || 'Request failed');
+            }
+
+            if (res.status === 204) return null;
+            return res.json();
+        }
+
+        // Load projects
+        async function loadProjects() {
+            projects = await api('/admin/all');
+            renderProjects();
+        }
+
+        // Safe DOM rendering using createElement
+        function renderProjects() {
+            // Clear existing content
+            while (elements.projectList.firstChild) {
+                elements.projectList.removeChild(elements.projectList.firstChild);
+            }
+
+            if (projects.length === 0) {
+                const emptyState = document.createElement('div');
+                emptyState.className = 'empty-state';
+                emptyState.textContent = 'No projects yet. Create your first one!';
+                elements.projectList.appendChild(emptyState);
+                return;
+            }
+
+            projects.forEach(p => {
+                const item = createProjectItem(p);
+                elements.projectList.appendChild(item);
+            });
+        }
+
+        function createProjectItem(project) {
+            const item = document.createElement('div');
+            item.className = 'project-item';
+
+            // Thumbnail
+            const thumb = document.createElement('img');
+            thumb.className = 'project-thumb';
+            thumb.alt = '';
+            thumb.src = project.image_url || 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg"/>';
+            thumb.onerror = () => { thumb.src = 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg"/>'; };
+            item.appendChild(thumb);
+
+            // Info
+            const info = document.createElement('div');
+            info.className = 'project-info';
+
+            const title = document.createElement('div');
+            title.className = 'project-title';
+            title.textContent = project.title;
+            info.appendChild(title);
+
+            const slug = document.createElement('div');
+            slug.className = 'project-slug';
+            slug.textContent = '/' + project.slug;
+            info.appendChild(slug);
+
+            item.appendChild(info);
+
+            // Featured badge container
+            const featuredContainer = document.createElement('div');
+            if (project.featured) {
+                const featuredBadge = document.createElement('span');
+                featuredBadge.className = 'badge featured';
+                featuredBadge.textContent = 'Featured';
+                featuredContainer.appendChild(featuredBadge);
+            }
+            item.appendChild(featuredContainer);
+
+            // Published badge container
+            const publishedContainer = document.createElement('div');
+            const publishedBadge = document.createElement('span');
+            publishedBadge.className = 'badge ' + (project.published ? 'published' : 'draft');
+            publishedBadge.textContent = project.published ? 'Published' : 'Draft';
+            publishedContainer.appendChild(publishedBadge);
+            item.appendChild(publishedContainer);
+
+            // Actions
+            const actions = document.createElement('div');
+            actions.className = 'project-actions';
+
+            const editBtn = document.createElement('button');
+            editBtn.className = 'btn-secondary';
+            editBtn.textContent = 'Edit';
+            editBtn.addEventListener('click', () => editProject(project.slug));
+            actions.appendChild(editBtn);
+
+            const deleteBtn = document.createElement('button');
+            deleteBtn.className = 'btn-danger';
+            deleteBtn.textContent = 'Delete';
+            deleteBtn.addEventListener('click', () => deleteProject(project.slug));
+            actions.appendChild(deleteBtn);
+
+            item.appendChild(actions);
+
+            return item;
+        }
+
+        // Editor
+        function openEditor(project = null) {
+            elements.editorTitle.textContent = project ? 'Edit Project' : 'New Project';
+            document.getElementById('editingSlug').value = project?.slug || '';
+
+            document.getElementById('title').value = project?.title || '';
+            document.getElementById('slug').value = project?.slug || '';
+            document.getElementById('description').value = project?.description || '';
+            document.getElementById('content').value = project?.content || '';
+            document.getElementById('image_url').value = project?.image_url || '';
+            document.getElementById('technologies').value = (project?.technologies || []).join(', ');
+            document.getElementById('link_github').value = project?.links?.github || '';
+            document.getElementById('link_live').value = project?.links?.live || '';
+            document.getElementById('order').value = project?.order || 0;
+            document.getElementById('published').checked = project?.published || false;
+            document.getElementById('featured').checked = project?.featured || false;
+
+            // Show image preview if exists
+            if (project?.image_url) {
+                elements.imagePreview.src = project.image_url;
+                elements.imagePreview.style.display = 'block';
+            } else {
+                elements.imagePreview.style.display = 'none';
+            }
+
+            elements.editorModal.classList.add('active');
+        }
+
+        function closeEditor() {
+            elements.editorModal.classList.remove('active');
+            elements.projectForm.reset();
+            elements.imagePreview.style.display = 'none';
+        }
+
+        async function editProject(slug) {
+            try {
+                const project = await api('/admin/' + slug);
+                openEditor(project);
+            } catch (e) {
+                toast('Failed to load project: ' + e.message, 'error');
+            }
+        }
+
+        async function saveProject() {
+            const editingSlug = document.getElementById('editingSlug').value;
+
+            const technologies = document.getElementById('technologies').value
+                .split(',')
+                .map(t => t.trim())
+                .filter(t => t);
+
+            const links = {};
+            const github = document.getElementById('link_github').value;
+            const live = document.getElementById('link_live').value;
+            if (github) links.github = github;
+            if (live) links.live = live;
+
+            const data = {
+                title: document.getElementById('title').value,
+                slug: document.getElementById('slug').value,
+                description: document.getElementById('description').value || null,
+                content: document.getElementById('content').value || null,
+                image_url: document.getElementById('image_url').value || null,
+                technologies: technologies,
+                links: links,
+                order: parseInt(document.getElementById('order').value) || 0,
+                published: document.getElementById('published').checked,
+                featured: document.getElementById('featured').checked,
+            };
+
+            try {
+                if (editingSlug) {
+                    await api('/' + editingSlug, {
+                        method: 'PUT',
+                        body: JSON.stringify(data),
+                    });
+                    toast('Project updated', 'success');
+                } else {
+                    await api('', {
+                        method: 'POST',
+                        body: JSON.stringify(data),
+                    });
+                    toast('Project created', 'success');
+                }
+
+                closeEditor();
+                await loadProjects();
+            } catch (e) {
+                toast('Failed to save: ' + e.message, 'error');
+            }
+        }
+
+        async function deleteProject(slug) {
+            if (!confirm('Delete project "' + slug + '"?')) return;
+
+            try {
+                await api('/' + slug, { method: 'DELETE' });
+                toast('Project deleted', 'success');
+                await loadProjects();
+            } catch (e) {
+                toast('Failed to delete: ' + e.message, 'error');
+            }
+        }
+
+        // Image upload handlers
+        function handleDragOver(e) {
+            e.preventDefault();
+            elements.imageUpload.classList.add('dragover');
+        }
+
+        function handleDragLeave() {
+            elements.imageUpload.classList.remove('dragover');
+        }
+
+        async function handleDrop(e) {
+            e.preventDefault();
+            elements.imageUpload.classList.remove('dragover');
+            const file = e.dataTransfer.files[0];
+            if (file) await uploadImage(file);
+        }
+
+        async function handleFileSelect(e) {
+            const file = e.target.files[0];
+            if (file) await uploadImage(file);
+        }
+
+        async function uploadImage(file) {
+            const formData = new FormData();
+            formData.append('file', file);
+
+            try {
+                const res = await fetch(API_BASE + '/projects/upload-image', {
+                    method: 'POST',
+                    headers: { 'X-API-Key': apiKey },
+                    body: formData,
+                });
+
+                if (!res.ok) {
+                    const err = await res.json().catch(() => ({}));
+                    throw new Error(err.detail || 'Upload failed');
+                }
+
+                const data = await res.json();
+                document.getElementById('image_url').value = data.url;
+
+                elements.imagePreview.src = data.url;
+                elements.imagePreview.style.display = 'block';
+
+                toast('Image uploaded', 'success');
+            } catch (e) {
+                toast('Upload failed: ' + e.message, 'error');
+            }
+        }
+
+        // Toast notifications (safe DOM creation)
+        function toast(message, type) {
+            type = type || 'info';
+            const toastEl = document.createElement('div');
+            toastEl.className = 'toast ' + type;
+            toastEl.textContent = message;
+            elements.toastContainer.appendChild(toastEl);
+            setTimeout(() => toastEl.remove(), 3000);
+        }
+
+        // Auto-generate slug from title
+        function autoGenerateSlug(e) {
+            const editingSlug = document.getElementById('editingSlug').value;
+
+            // Only auto-generate for new projects
+            if (!editingSlug) {
+                elements.slugInput.value = e.target.value
+                    .toLowerCase()
+                    .replace(/[^a-z0-9]+/g, '-')
+                    .replace(/^-|-$/g, '');
+            }
+        }
+    </script>
+</body>
+</html>
