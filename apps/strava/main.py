@@ -10,8 +10,11 @@ from datetime import datetime
 from fastapi import FastAPI, APIRouter, Depends, HTTPException
 from fastapi.responses import RedirectResponse, FileResponse
 from sqlalchemy.orm import Session
-from sqlalchemy import desc, extract
+from sqlalchemy import desc, extract, func
 from stravalib.client import Client
+
+# Minimum year for stats queries (no data before 2024)
+MIN_YEAR = 2024
 
 from apps.shared.database import get_db, Base, engine, check_db_connection
 from apps.shared.auth import get_api_key
@@ -165,21 +168,53 @@ def oauth_callback(code: str, state: str, db: Session = Depends(get_db)):
     return RedirectResponse(url=f"{frontend_url}/?strava=success")
 
 
-@router.get("/stats/ytd")
-def get_ytd_stats(db: Session = Depends(get_db)):
+@router.get("/stats/summary/{year}")
+def get_year_summary(year: int, db: Session = Depends(get_db)):
     """
-    Get cached year-to-date statistics.
-    Returns run and ride totals for current year.
+    Get yearly statistics for a specific year.
+    Returns totals for all activity types (Run, Ride, Swim, etc.)
     """
-    stats = db.query(StravaStats).filter(StravaStats.stats_type == "ytd").first()
-
-    if not stats:
+    current_year = datetime.now().year
+    if year < MIN_YEAR or year > current_year:
         raise HTTPException(
-            status_code=404,
-            detail="YTD stats not cached yet. Try /strava/refresh-data"
+            status_code=400,
+            detail=f"Year must be between {MIN_YEAR} and {current_year}"
         )
 
-    return stats.to_dict()
+    # Query and aggregate from StravaActivity
+    from sqlalchemy import sum as sql_sum
+
+    results = (
+        db.query(
+            StravaActivity.type,
+            func.count(StravaActivity.id).label("count"),
+            sql_sum(StravaActivity.distance).label("distance"),
+            sql_sum(StravaActivity.moving_time).label("moving_time"),
+            sql_sum(StravaActivity.total_elevation_gain).label("elevation_gain")
+        )
+        .filter(extract('year', StravaActivity.start_date_local) == year)
+        .group_by(StravaActivity.type)
+        .all()
+    )
+
+    if not results:
+        raise HTTPException(
+            status_code=404,
+            detail=f"No activities found for year {year}"
+        )
+
+    return {
+        "year": year,
+        "data": {
+            r.type: {
+                "count": r.count,
+                "distance": float(r.distance) if r.distance else 0,
+                "moving_time": int(r.moving_time) if r.moving_time else 0,
+                "elevation_gain": float(r.elevation_gain) if r.elevation_gain else 0
+            } for r in results
+        },
+        "fetched_at": datetime.now().isoformat()
+    }
 
 
 @router.get("/stats/activities")

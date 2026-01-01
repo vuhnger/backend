@@ -2,15 +2,19 @@
 Background tasks for fetching and caching Strava data
 """
 import logging
+from datetime import datetime
 from typing import Dict, Any, List
 from sqlalchemy.orm import Session
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from apps.shared.database import SessionLocal
 from apps.strava.models import StravaStats, StravaActivity
-from apps.strava.client import get_ytd_stats, get_recent_activities, get_monthly_stats, get_all_activities
+from apps.strava.client import get_recent_activities, get_monthly_stats, get_all_activities
 from apps.shared.upsert import atomic_upsert_stats
 
 logger = logging.getLogger(__name__)
+
+# Only sync activities from 2024 onwards
+ACTIVITY_CUTOFF = datetime(2024, 1, 1)
 
 
 def fetch_and_cache_stats():
@@ -25,14 +29,9 @@ def fetch_and_cache_stats():
     try:
         logger.info("Fetching Strava data...")
 
-        # Sync all historic activities
+        # Sync activities from 2024 onwards
         sync_activities(db)
-        logger.info("Synced all activities to database")
-
-        # Fetch YTD stats
-        ytd_data = get_ytd_stats(db)
-        upsert_stats(db, "ytd", ytd_data, commit=False)
-        logger.info("YTD stats prepared")
+        logger.info("Synced activities to database")
 
         # Fetch recent activities
         activities_data = get_recent_activities(db, limit=30)
@@ -59,10 +58,10 @@ def fetch_and_cache_stats():
 
 def sync_activities(db: Session):
     """
-    Fetch all activities and upsert them into the database.
+    Fetch activities from 2024 onwards and upsert them into the database.
     Uses efficient bulk upsert.
     """
-    activities_gen = get_all_activities(db)
+    activities_gen = get_all_activities(db, after=ACTIVITY_CUTOFF)
     
     count = 0
     batch = []
