@@ -69,13 +69,12 @@ def sync_activities(db: Session):
 
     for activity_data in activities_gen:
         batch.append(activity_data)
-        
+        count += 1
+
         if len(batch) >= BATCH_SIZE:
             _bulk_upsert_activities(db, batch)
             batch = []
-            logger.info(f"Synced {count + BATCH_SIZE} activities...")
-        
-        count += 1
+            logger.info(f"Synced {count} activities...")
 
     if batch:
         _bulk_upsert_activities(db, batch)
