@@ -190,10 +190,14 @@ def get_year_summary(year: int, db: Session = Depends(get_db)):
     """
     Get yearly statistics for a specific year.
     Returns totals for all activity types (Run, Ride, Swim, etc.)
+    Only includes activities from MIN_YEAR (2024) onwards.
     """
     year = validate_year(year)
 
-    # Query and aggregate from StravaActivity
+    # Use range query for better index usage (vs extract which requires full scan)
+    year_start = datetime(year, 1, 1)
+    year_end = datetime(year + 1, 1, 1)
+
     results = (
         db.query(
             StravaActivity.type,
@@ -202,7 +206,10 @@ def get_year_summary(year: int, db: Session = Depends(get_db)):
             func.sum(StravaActivity.moving_time).label("moving_time"),
             func.sum(StravaActivity.total_elevation_gain).label("elevation_gain")
         )
-        .filter(extract('year', StravaActivity.start_date_local) == year)
+        .filter(
+            StravaActivity.start_date_local >= year_start,
+            StravaActivity.start_date_local < year_end
+        )
         .group_by(StravaActivity.type)
         .all()
     )
@@ -265,15 +272,20 @@ def get_monthly_stats(db: Session = Depends(get_db)):
 def get_longest_run(year: int = None, db: Session = Depends(get_db)):
     """
     Get the longest run for a specific year (default: current year).
-    Query from full activity history.
+    Only includes activities from MIN_YEAR (2024) onwards.
     """
     year = validate_year(year, allow_none=True)
+
+    # Use range query for better index usage
+    year_start = datetime(year, 1, 1)
+    year_end = datetime(year + 1, 1, 1)
 
     longest_run = (
         db.query(StravaActivity)
         .filter(
             StravaActivity.type == "Run",
-            extract('year', StravaActivity.start_date_local) == year
+            StravaActivity.start_date_local >= year_start,
+            StravaActivity.start_date_local < year_end
         )
         .order_by(desc(StravaActivity.distance))
         .first()
@@ -292,15 +304,20 @@ def get_longest_run(year: int = None, db: Session = Depends(get_db)):
 def get_longest_ride(year: int = None, db: Session = Depends(get_db)):
     """
     Get the longest ride for a specific year (default: current year).
-    Query from full activity history.
+    Only includes activities from MIN_YEAR (2024) onwards.
     """
     year = validate_year(year, allow_none=True)
+
+    # Use range query for better index usage
+    year_start = datetime(year, 1, 1)
+    year_end = datetime(year + 1, 1, 1)
 
     longest_ride = (
         db.query(StravaActivity)
         .filter(
             StravaActivity.type == "Ride",
-            extract('year', StravaActivity.start_date_local) == year
+            StravaActivity.start_date_local >= year_start,
+            StravaActivity.start_date_local < year_end
         )
         .order_by(desc(StravaActivity.distance))
         .first()
