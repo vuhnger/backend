@@ -2,19 +2,16 @@
 Background tasks for fetching and caching Strava data
 """
 import logging
-from datetime import datetime
 from typing import Dict, Any, List
 from sqlalchemy.orm import Session
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from apps.shared.database import SessionLocal
 from apps.strava.models import StravaStats, StravaActivity
 from apps.strava.client import get_recent_activities, get_monthly_stats, get_all_activities
+from apps.strava.constants import ACTIVITY_CUTOFF
 from apps.shared.upsert import atomic_upsert_stats
 
 logger = logging.getLogger(__name__)
-
-# Only sync activities from 2024 onwards
-ACTIVITY_CUTOFF = datetime(2024, 1, 1)
 
 
 def fetch_and_cache_stats():

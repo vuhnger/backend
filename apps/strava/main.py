@@ -13,10 +13,8 @@ from sqlalchemy.orm import Session
 from sqlalchemy import desc, extract, func
 from stravalib.client import Client
 
-# Minimum year for stats queries (no data before 2024)
-MIN_YEAR = 2024
-
 from apps.shared.database import get_db, Base, engine, check_db_connection
+from apps.strava.constants import MIN_YEAR
 from apps.shared.auth import get_api_key
 from apps.shared.cors import setup_cors
 from apps.shared.oauth_state import generate_state, validate_state
@@ -182,15 +180,13 @@ def get_year_summary(year: int, db: Session = Depends(get_db)):
         )
 
     # Query and aggregate from StravaActivity
-    from sqlalchemy import sum as sql_sum
-
     results = (
         db.query(
             StravaActivity.type,
             func.count(StravaActivity.id).label("count"),
-            sql_sum(StravaActivity.distance).label("distance"),
-            sql_sum(StravaActivity.moving_time).label("moving_time"),
-            sql_sum(StravaActivity.total_elevation_gain).label("elevation_gain")
+            func.sum(StravaActivity.distance).label("distance"),
+            func.sum(StravaActivity.moving_time).label("moving_time"),
+            func.sum(StravaActivity.total_elevation_gain).label("elevation_gain")
         )
         .filter(extract('year', StravaActivity.start_date_local) == year)
         .group_by(StravaActivity.type)
@@ -257,8 +253,15 @@ def get_longest_run(year: int = None, db: Session = Depends(get_db)):
     Get the longest run for a specific year (default: current year).
     Query from full activity history.
     """
+    current_year = datetime.now().year
     if year is None:
-        year = datetime.now().year
+        year = current_year
+
+    if year < MIN_YEAR or year > current_year:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Year must be between {MIN_YEAR} and {current_year}"
+        )
 
     longest_run = (
         db.query(StravaActivity)
@@ -285,8 +288,15 @@ def get_longest_ride(year: int = None, db: Session = Depends(get_db)):
     Get the longest ride for a specific year (default: current year).
     Query from full activity history.
     """
+    current_year = datetime.now().year
     if year is None:
-        year = datetime.now().year
+        year = current_year
+
+    if year < MIN_YEAR or year > current_year:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Year must be between {MIN_YEAR} and {current_year}"
+        )
 
     longest_ride = (
         db.query(StravaActivity)

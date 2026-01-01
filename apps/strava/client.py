@@ -80,7 +80,7 @@ def get_monthly_stats(db: Session, months: int = 12) -> Dict[str, Dict[str, Any]
     return result
 
 
-def get_all_activities(db: Session, after: Optional[datetime] = None, limit: int = None):
+def get_all_activities(db: Session, after: Optional[datetime] = None, limit: Optional[int] = None):
     """
     Fetch activities from Strava, optionally after a given date.
     Yields activity data dictionaries suitable for StravaActivity model.
