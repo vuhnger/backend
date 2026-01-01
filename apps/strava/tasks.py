@@ -70,11 +70,13 @@ def sync_activities(db: Session):
 
         if len(batch) >= BATCH_SIZE:
             _bulk_upsert_activities(db, batch)
+            db.flush()  # Persist to DB but keep transaction open
             batch = []
             logger.info(f"Synced {count} activities...")
 
     if batch:
         _bulk_upsert_activities(db, batch)
+        db.flush()
     
     logger.info(f"Total activities synced: {count}")
 

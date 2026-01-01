@@ -3,7 +3,7 @@ Strava API client wrapper using stravalib
 """
 from datetime import datetime, timedelta
 from collections import defaultdict
-from typing import Dict, List, Any, Optional
+from typing import Dict, List, Any, Optional, Generator
 from stravalib.client import Client
 from sqlalchemy.orm import Session
 from apps.strava.utils import get_valid_token
@@ -80,7 +80,7 @@ def get_monthly_stats(db: Session, months: int = 12) -> Dict[str, Dict[str, Any]
     return result
 
 
-def get_all_activities(db: Session, after: Optional[datetime] = None, limit: Optional[int] = None):
+def get_all_activities(db: Session, after: Optional[datetime] = None, limit: Optional[int] = None) -> Generator[Dict[str, Any], None, None]:
     """
     Fetch activities from Strava, optionally after a given date.
     Yields activity data dictionaries suitable for StravaActivity model.
