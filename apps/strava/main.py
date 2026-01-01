@@ -7,6 +7,7 @@ Single user mode - stores one set of tokens and serves cached data.
 import os
 import logging
 from datetime import datetime
+from typing import Optional
 from fastapi import FastAPI, APIRouter, Depends, HTTPException
 from fastapi.responses import RedirectResponse, FileResponse
 from sqlalchemy.orm import Session
@@ -27,7 +28,7 @@ logger = logging.getLogger(__name__)
 from fastapi.openapi.docs import get_swagger_ui_html
 
 
-def validate_year(year: int, allow_none: bool = False) -> int:
+def validate_year(year: Optional[int], allow_none: bool = False) -> int:
     """
     Validate year parameter against MIN_YEAR and current year.
     Returns validated year, defaulting to current year if None and allowed.
