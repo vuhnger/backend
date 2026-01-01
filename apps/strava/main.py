@@ -7,13 +7,15 @@ Single user mode - stores one set of tokens and serves cached data.
 import os
 import logging
 from datetime import datetime
+from typing import Optional
 from fastapi import FastAPI, APIRouter, Depends, HTTPException
 from fastapi.responses import RedirectResponse, FileResponse
 from sqlalchemy.orm import Session
-from sqlalchemy import desc, extract
+from sqlalchemy import desc, extract, func
 from stravalib.client import Client
 
 from apps.shared.database import get_db, Base, engine, check_db_connection
+from apps.strava.constants import MIN_YEAR, ACTIVITY_CUTOFF
 from apps.shared.auth import get_api_key
 from apps.shared.cors import setup_cors
 from apps.shared.oauth_state import generate_state, validate_state
@@ -24,6 +26,24 @@ from apps.strava.tasks import fetch_and_cache_stats
 logger = logging.getLogger(__name__)
 
 from fastapi.openapi.docs import get_swagger_ui_html
+
+
+def validate_year(year: Optional[int], allow_none: bool = False) -> int:
+    """
+    Validate year parameter against MIN_YEAR and current year.
+    Returns validated year, defaulting to current year if None and allowed.
+    """
+    current_year = datetime.now().year
+    if year is None:
+        if allow_none:
+            return current_year
+        raise HTTPException(status_code=400, detail="Year is required")
+    if year < MIN_YEAR or year > current_year:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Year must be between {MIN_YEAR} and {current_year}"
+        )
+    return year
 
 # Create database tables
 Base.metadata.create_all(bind=engine)
@@ -165,21 +185,53 @@ def oauth_callback(code: str, state: str, db: Session = Depends(get_db)):
     return RedirectResponse(url=f"{frontend_url}/?strava=success")
 
 
-@router.get("/stats/ytd")
-def get_ytd_stats(db: Session = Depends(get_db)):
+@router.get("/stats/summary/{year}")
+def get_year_summary(year: int, db: Session = Depends(get_db)):
     """
-    Get cached year-to-date statistics.
-    Returns run and ride totals for current year.
+    Get yearly statistics for a specific year.
+    Returns totals for all activity types (Run, Ride, Swim, etc.)
+    Only includes activities from MIN_YEAR (2024) onwards.
     """
-    stats = db.query(StravaStats).filter(StravaStats.stats_type == "ytd").first()
+    year = validate_year(year)
 
-    if not stats:
+    # Use range query for better index usage (vs extract which requires full scan)
+    year_start = datetime(year, 1, 1)
+    year_end = datetime(year + 1, 1, 1)
+
+    results = (
+        db.query(
+            StravaActivity.type,
+            func.count(StravaActivity.id).label("count"),
+            func.sum(StravaActivity.distance).label("distance"),
+            func.sum(StravaActivity.moving_time).label("moving_time"),
+            func.sum(StravaActivity.total_elevation_gain).label("elevation_gain")
+        )
+        .filter(
+            StravaActivity.start_date_local >= year_start,
+            StravaActivity.start_date_local < year_end
+        )
+        .group_by(StravaActivity.type)
+        .all()
+    )
+
+    if not results:
         raise HTTPException(
             status_code=404,
-            detail="YTD stats not cached yet. Try /strava/refresh-data"
+            detail=f"No activities found for year {year}"
         )
 
-    return stats.to_dict()
+    return {
+        "year": year,
+        "data": {
+            r.type: {
+                "count": r.count,
+                "distance": float(r.distance) if r.distance else 0,
+                "moving_time": int(r.moving_time) if r.moving_time else 0,
+                "elevation_gain": float(r.elevation_gain) if r.elevation_gain else 0
+            } for r in results
+        },
+        "fetched_at": datetime.now().isoformat()
+    }
 
 
 @router.get("/stats/activities")
@@ -220,16 +272,20 @@ def get_monthly_stats(db: Session = Depends(get_db)):
 def get_longest_run(year: int = None, db: Session = Depends(get_db)):
     """
     Get the longest run for a specific year (default: current year).
-    Query from full activity history.
+    Only includes activities from MIN_YEAR (2024) onwards.
     """
-    if year is None:
-        year = datetime.now().year
+    year = validate_year(year, allow_none=True)
+
+    # Use range query for better index usage
+    year_start = datetime(year, 1, 1)
+    year_end = datetime(year + 1, 1, 1)
 
     longest_run = (
         db.query(StravaActivity)
         .filter(
             StravaActivity.type == "Run",
-            extract('year', StravaActivity.start_date_local) == year
+            StravaActivity.start_date_local >= year_start,
+            StravaActivity.start_date_local < year_end
         )
         .order_by(desc(StravaActivity.distance))
         .first()
@@ -248,16 +304,20 @@ def get_longest_run(year: int = None, db: Session = Depends(get_db)):
 def get_longest_ride(year: int = None, db: Session = Depends(get_db)):
     """
     Get the longest ride for a specific year (default: current year).
-    Query from full activity history.
+    Only includes activities from MIN_YEAR (2024) onwards.
     """
-    if year is None:
-        year = datetime.now().year
+    year = validate_year(year, allow_none=True)
+
+    # Use range query for better index usage
+    year_start = datetime(year, 1, 1)
+    year_end = datetime(year + 1, 1, 1)
 
     longest_ride = (
         db.query(StravaActivity)
         .filter(
             StravaActivity.type == "Ride",
-            extract('year', StravaActivity.start_date_local) == year
+            StravaActivity.start_date_local >= year_start,
+            StravaActivity.start_date_local < year_end
         )
         .order_by(desc(StravaActivity.distance))
         .first()
@@ -277,15 +337,13 @@ def get_all_time_totals(db: Session = Depends(get_db)):
     """
     Get all-time totals for each activity type.
     """
-    from sqlalchemy import sum
-    
     results = (
         db.query(
             StravaActivity.type,
             func.count(StravaActivity.id).label("count"),
-            sum(StravaActivity.distance).label("distance"),
-            sum(StravaActivity.moving_time).label("moving_time"),
-            sum(StravaActivity.total_elevation_gain).label("elevation_gain")
+            func.sum(StravaActivity.distance).label("distance"),
+            func.sum(StravaActivity.moving_time).label("moving_time"),
+            func.sum(StravaActivity.total_elevation_gain).label("elevation_gain")
         )
         .group_by(StravaActivity.type)
         .all()
@@ -309,20 +367,20 @@ def get_all_time_totals(db: Session = Depends(get_db)):
 def get_yearly_stats(db: Session = Depends(get_db)):
     """
     Get activity totals grouped by year and type.
+    Only includes activities from MIN_YEAR onwards.
     """
-    from sqlalchemy import sum
-    
     year_col = extract('year', StravaActivity.start_date_local)
-    
+
     results = (
         db.query(
             year_col.label("year"),
             StravaActivity.type,
             func.count(StravaActivity.id).label("count"),
-            sum(StravaActivity.distance).label("distance"),
-            sum(StravaActivity.moving_time).label("moving_time"),
-            sum(StravaActivity.total_elevation_gain).label("elevation_gain")
+            func.sum(StravaActivity.distance).label("distance"),
+            func.sum(StravaActivity.moving_time).label("moving_time"),
+            func.sum(StravaActivity.total_elevation_gain).label("elevation_gain")
         )
+        .filter(StravaActivity.start_date_local >= ACTIVITY_CUTOFF)
         .group_by(year_col, StravaActivity.type)
         .order_by(desc("year"), StravaActivity.type)
         .all()

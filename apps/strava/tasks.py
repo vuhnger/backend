@@ -2,15 +2,21 @@
 Background tasks for fetching and caching Strava data
 """
 import logging
+import time
 from typing import Dict, Any, List
 from sqlalchemy.orm import Session
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from apps.shared.database import SessionLocal
 from apps.strava.models import StravaStats, StravaActivity
-from apps.strava.client import get_ytd_stats, get_recent_activities, get_monthly_stats, get_all_activities
+from apps.strava.client import get_recent_activities, get_monthly_stats, get_all_activities
+from apps.strava.constants import ACTIVITY_CUTOFF
 from apps.shared.upsert import atomic_upsert_stats
 
 logger = logging.getLogger(__name__)
+
+# Rate limiting: Strava allows 100 requests per 15 minutes
+# Add delay between batches to stay well under limit
+RATE_LIMIT_DELAY_SECONDS = 1.0
 
 
 def fetch_and_cache_stats():
@@ -25,14 +31,9 @@ def fetch_and_cache_stats():
     try:
         logger.info("Fetching Strava data...")
 
-        # Sync all historic activities
+        # Sync activities from 2024 onwards
         sync_activities(db)
-        logger.info("Synced all activities to database")
-
-        # Fetch YTD stats
-        ytd_data = get_ytd_stats(db)
-        upsert_stats(db, "ytd", ytd_data, commit=False)
-        logger.info("YTD stats prepared")
+        logger.info("Synced activities to database")
 
         # Fetch recent activities
         activities_data = get_recent_activities(db, limit=30)
@@ -59,29 +60,35 @@ def fetch_and_cache_stats():
 
 def sync_activities(db: Session):
     """
-    Fetch all activities and upsert them into the database.
-    Uses efficient bulk upsert.
+    Fetch activities from 2024 onwards and upsert them into the database.
+    Uses efficient bulk upsert with rate limiting to respect Strava API limits.
     """
-    activities_gen = get_all_activities(db)
-    
+    activities_gen = get_all_activities(db, after=ACTIVITY_CUTOFF)
+
     count = 0
     batch = []
+    batch_count = 0
     BATCH_SIZE = 100
 
     for activity_data in activities_gen:
         batch.append(activity_data)
-        
+        count += 1
+
         if len(batch) >= BATCH_SIZE:
             _bulk_upsert_activities(db, batch)
+            db.flush()  # Persist to DB but keep transaction open
             batch = []
-            logger.info(f"Synced {count + BATCH_SIZE} activities...")
-        
-        count += 1
+            batch_count += 1
+            logger.info(f"Synced {count} activities...")
+
+            # Rate limiting: pause between batches to respect Strava API limits
+            time.sleep(RATE_LIMIT_DELAY_SECONDS)
 
     if batch:
         _bulk_upsert_activities(db, batch)
-    
-    logger.info(f"Total activities synced: {count}")
+        db.flush()
+
+    logger.info(f"Total activities synced: {count} in {batch_count + 1} batches")
 
 
 def _bulk_upsert_activities(db: Session, activities: List[Dict[str, Any]]):

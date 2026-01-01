@@ -3,42 +3,10 @@ Strava API client wrapper using stravalib
 """
 from datetime import datetime, timedelta
 from collections import defaultdict
-from typing import Dict, List, Any
+from typing import Dict, List, Any, Optional, Generator
 from stravalib.client import Client
 from sqlalchemy.orm import Session
 from apps.strava.utils import get_valid_token
-
-
-def get_ytd_stats(db: Session) -> Dict[str, Dict[str, Any]]:
-    """
-    Fetch year-to-date statistics from Strava.
-    Returns: dict with counts, distances, times, elevation
-    """
-    access_token = get_valid_token(db)
-    client = Client(access_token=access_token)
-
-    # Get athlete stats
-    athlete = client.get_athlete()
-    stats = client.get_athlete_stats(athlete.id)
-
-    # Extract YTD totals
-    ytd_run = stats.ytd_run_totals
-    ytd_ride = stats.ytd_ride_totals
-
-    return {
-        "run": {
-            "count": ytd_run.count,
-            "distance": float(ytd_run.distance),  # meters
-            "moving_time": int(ytd_run.moving_time.total_seconds()) if ytd_run.moving_time else 0,  # seconds
-            "elevation_gain": float(ytd_run.elevation_gain)  # meters
-        },
-        "ride": {
-            "count": ytd_ride.count,
-            "distance": float(ytd_ride.distance),
-            "moving_time": int(ytd_ride.moving_time.total_seconds()) if ytd_ride.moving_time else 0,  # seconds
-            "elevation_gain": float(ytd_ride.elevation_gain)
-        }
-    }
 
 
 def get_recent_activities(db: Session, limit: int = 30) -> List[Dict[str, Any]]:
@@ -112,16 +80,21 @@ def get_monthly_stats(db: Session, months: int = 12) -> Dict[str, Dict[str, Any]
     return result
 
 
-def get_all_activities(db: Session, limit: int = None):
+def get_all_activities(db: Session, after: Optional[datetime] = None, limit: Optional[int] = None) -> Generator[Dict[str, Any], None, None]:
     """
-    Fetch all historic activities from Strava.
+    Fetch activities from Strava, optionally after a given date.
     Yields activity data dictionaries suitable for StravaActivity model.
+
+    Args:
+        db: Database session for token access
+        after: Only fetch activities after this datetime (server-side filter)
+        limit: Maximum number of activities to fetch (None for all)
     """
     access_token = get_valid_token(db)
     client = Client(access_token=access_token)
 
-    # Get all activities (paginated automatically by stravalib)
-    activities = client.get_activities(limit=limit)
+    # Get activities (paginated automatically by stravalib)
+    activities = client.get_activities(after=after, limit=limit)
 
     for activity in activities:
         yield {
