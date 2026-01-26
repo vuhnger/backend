@@ -3,11 +3,13 @@ n8n Health Check Service
 
 Provides a health check endpoint that verifies n8n.vuhnger.dev is operational.
 """
+
 import logging
 import httpx
 from fastapi import FastAPI, APIRouter
 
 from apps.shared.cors import setup_cors
+from apps.shared.nosniff_headers import setup_nosniff_header
 
 logger = logging.getLogger(__name__)
 
@@ -16,13 +18,15 @@ app = FastAPI(
     version="1.0.0",
     description="Health check proxy for n8n automation platform",
     docs_url="/n8n/docs",
-    openapi_url="/n8n/openapi.json"
+    openapi_url="/n8n/openapi.json",
 )
 
 # Setup CORS from shared configuration
 setup_cors(app)
+setup_nosniff_header(app)
 
 router = APIRouter(prefix="/n8n", tags=["n8n"])
+
 
 @router.get("/health")
 async def health():
@@ -32,17 +36,13 @@ async def health():
             response = await client.get("https://n8n.vuhnger.dev")
 
             if response.status_code == 200:
-                return {
-                    "status": "ok",
-                    "service": "n8n",
-                    "url": "n8n.vuhnger.dev"
-                }
+                return {"status": "ok", "service": "n8n", "url": "n8n.vuhnger.dev"}
             else:
                 return {
                     "status": "degraded",
                     "service": "n8n",
                     "url": "n8n.vuhnger.dev",
-                    "http_status": response.status_code
+                    "http_status": response.status_code,
                 }
     except Exception as e:
         logger.error(f"n8n health check failed: {str(e)}")
@@ -50,7 +50,8 @@ async def health():
             "status": "error",
             "service": "n8n",
             "url": "n8n.vuhnger.dev",
-            "error": "unreachable"
+            "error": "unreachable",
         }
+
 
 app.include_router(router)
