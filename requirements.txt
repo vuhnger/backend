@@ -16,7 +16,7 @@ cryptography==44.0.1
 
 # File handling
 aiofiles==24.1.0
-python-multipart==0.0.18
+python-multipart==0.0.22
 
 # Testing
 pytest==8.0.0
