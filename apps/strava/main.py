@@ -4,6 +4,7 @@ Strava Service API
 OAuth integration for Strava with cached statistics.
 Single user mode - stores one set of tokens and serves cached data.
 """
+
 import os
 import logging
 from datetime import datetime
@@ -16,6 +17,7 @@ from stravalib.client import Client
 from apps.shared.database import get_db, Base, engine, check_db_connection
 from apps.shared.auth import get_api_key
 from apps.shared.cors import setup_cors
+from apps.shared.clickjacking_headers import setup_clickjacking_headers
 from apps.shared.oauth_state import generate_state, validate_state
 from apps.shared.errors import log_and_sanitize_error
 from apps.strava.models import StravaAuth, StravaStats, StravaActivity
@@ -33,11 +35,12 @@ app = FastAPI(
     version="1.0.0",
     description="Strava OAuth integration with cached activity statistics",
     docs_url="/strava/docs",
-    openapi_url="/strava/openapi.json"
+    openapi_url="/strava/openapi.json",
 )
 
 # Setup CORS from shared configuration
 setup_cors(app)
+setup_clickjacking_headers(app)
 
 # Router setup
 router = APIRouter(prefix="/strava")
@@ -55,7 +58,7 @@ def health():
     return {
         "status": "ok" if db_connected else "degraded",
         "service": "strava",
-        "database": "connected" if db_connected else "disconnected"
+        "database": "connected" if db_connected else "disconnected",
     }
 
 
@@ -96,7 +99,9 @@ def oauth_callback(code: str, state: str, db: Session = Depends(get_db)):
     """
     # Verify state for CSRF protection
     if not validate_state(state):
-        raise HTTPException(status_code=400, detail="Invalid or expired state parameter")
+        raise HTTPException(
+            status_code=400, detail="Invalid or expired state parameter"
+        )
 
     client_id = os.getenv("STRAVA_CLIENT_ID")
     client_secret = os.getenv("STRAVA_CLIENT_SECRET")
@@ -108,9 +113,7 @@ def oauth_callback(code: str, state: str, db: Session = Depends(get_db)):
         # Exchange code for tokens
         client = Client()
         token_response = client.exchange_code_for_token(
-            client_id=client_id,
-            client_secret=client_secret,
-            code=code
+            client_id=client_id, client_secret=client_secret, code=code
         )
 
         # Extract token data
@@ -136,21 +139,19 @@ def oauth_callback(code: str, state: str, db: Session = Depends(get_db)):
             db=db,
             model=StravaAuth,
             auth_data={
-                'id': 1,
-                'athlete_id': athlete_id,
-                'access_token': encrypt_token(access_token),
-                'refresh_token': encrypt_token(refresh_token),
-                'expires_at': expires_at
-            }
+                "id": 1,
+                "athlete_id": athlete_id,
+                "access_token": encrypt_token(access_token),
+                "refresh_token": encrypt_token(refresh_token),
+                "expires_at": expires_at,
+            },
         )
         db.commit()
     except Exception as e:
         # Rollback any pending database changes to maintain session consistency
         db.rollback()
         sanitized_msg, error_id = log_and_sanitize_error(
-            e,
-            "OAuth token exchange",
-            "OAuth authorization failed. Please try again."
+            e, "OAuth token exchange", "OAuth authorization failed. Please try again."
         )
         raise HTTPException(status_code=500, detail=sanitized_msg)
 
@@ -175,8 +176,7 @@ def get_ytd_stats(db: Session = Depends(get_db)):
 
     if not stats:
         raise HTTPException(
-            status_code=404,
-            detail="YTD stats not cached yet. Try /strava/refresh-data"
+            status_code=404, detail="YTD stats not cached yet. Try /strava/refresh-data"
         )
 
     return stats.to_dict()
@@ -188,12 +188,16 @@ def get_activities(db: Session = Depends(get_db)):
     Get cached recent activities (last 30).
     Returns list of activities with basic info.
     """
-    stats = db.query(StravaStats).filter(StravaStats.stats_type == "recent_activities").first()
+    stats = (
+        db.query(StravaStats)
+        .filter(StravaStats.stats_type == "recent_activities")
+        .first()
+    )
 
     if not stats:
         raise HTTPException(
             status_code=404,
-            detail="Activities not cached yet. Try /strava/refresh-data"
+            detail="Activities not cached yet. Try /strava/refresh-data",
         )
 
     return stats.to_dict()
@@ -210,7 +214,7 @@ def get_monthly_stats(db: Session = Depends(get_db)):
     if not stats:
         raise HTTPException(
             status_code=404,
-            detail="Monthly stats not cached yet. Try /strava/refresh-data"
+            detail="Monthly stats not cached yet. Try /strava/refresh-data",
         )
 
     return stats.to_dict()
@@ -229,7 +233,7 @@ def get_longest_run(year: int = None, db: Session = Depends(get_db)):
         db.query(StravaActivity)
         .filter(
             StravaActivity.type == "Run",
-            extract('year', StravaActivity.start_date_local) == year
+            extract("year", StravaActivity.start_date_local) == year,
         )
         .order_by(desc(StravaActivity.distance))
         .first()
@@ -238,7 +242,7 @@ def get_longest_run(year: int = None, db: Session = Depends(get_db)):
     if not longest_run:
         raise HTTPException(
             status_code=404,
-            detail=f"No runs found for year {year}. Try /strava/refresh-data"
+            detail=f"No runs found for year {year}. Try /strava/refresh-data",
         )
 
     return longest_run.to_dict()
@@ -257,7 +261,7 @@ def get_longest_ride(year: int = None, db: Session = Depends(get_db)):
         db.query(StravaActivity)
         .filter(
             StravaActivity.type == "Ride",
-            extract('year', StravaActivity.start_date_local) == year
+            extract("year", StravaActivity.start_date_local) == year,
         )
         .order_by(desc(StravaActivity.distance))
         .first()
@@ -266,7 +270,7 @@ def get_longest_ride(year: int = None, db: Session = Depends(get_db)):
     if not longest_ride:
         raise HTTPException(
             status_code=404,
-            detail=f"No rides found for year {year}. Try /strava/refresh-data"
+            detail=f"No rides found for year {year}. Try /strava/refresh-data",
         )
 
     return longest_ride.to_dict()
@@ -278,14 +282,14 @@ def get_all_time_totals(db: Session = Depends(get_db)):
     Get all-time totals for each activity type.
     """
     from sqlalchemy import sum
-    
+
     results = (
         db.query(
             StravaActivity.type,
             func.count(StravaActivity.id).label("count"),
             sum(StravaActivity.distance).label("distance"),
             sum(StravaActivity.moving_time).label("moving_time"),
-            sum(StravaActivity.total_elevation_gain).label("elevation_gain")
+            sum(StravaActivity.total_elevation_gain).label("elevation_gain"),
         )
         .group_by(StravaActivity.type)
         .all()
@@ -298,10 +302,11 @@ def get_all_time_totals(db: Session = Depends(get_db)):
                 "count": r.count,
                 "distance": float(r.distance) if r.distance else 0,
                 "moving_time": int(r.moving_time) if r.moving_time else 0,
-                "elevation_gain": float(r.elevation_gain) if r.elevation_gain else 0
-            } for r in results
+                "elevation_gain": float(r.elevation_gain) if r.elevation_gain else 0,
+            }
+            for r in results
         },
-        "fetched_at": datetime.now().isoformat()
+        "fetched_at": datetime.now().isoformat(),
     }
 
 
@@ -311,9 +316,9 @@ def get_yearly_stats(db: Session = Depends(get_db)):
     Get activity totals grouped by year and type.
     """
     from sqlalchemy import sum
-    
-    year_col = extract('year', StravaActivity.start_date_local)
-    
+
+    year_col = extract("year", StravaActivity.start_date_local)
+
     results = (
         db.query(
             year_col.label("year"),
@@ -321,7 +326,7 @@ def get_yearly_stats(db: Session = Depends(get_db)):
             func.count(StravaActivity.id).label("count"),
             sum(StravaActivity.distance).label("distance"),
             sum(StravaActivity.moving_time).label("moving_time"),
-            sum(StravaActivity.total_elevation_gain).label("elevation_gain")
+            sum(StravaActivity.total_elevation_gain).label("elevation_gain"),
         )
         .group_by(year_col, StravaActivity.type)
         .order_by(desc("year"), StravaActivity.type)
@@ -333,18 +338,18 @@ def get_yearly_stats(db: Session = Depends(get_db)):
         year_str = str(int(r.year))
         if year_str not in data:
             data[year_str] = {}
-        
+
         data[year_str][r.type] = {
             "count": r.count,
             "distance": float(r.distance) if r.distance else 0,
             "moving_time": int(r.moving_time) if r.moving_time else 0,
-            "elevation_gain": float(r.elevation_gain) if r.elevation_gain else 0
+            "elevation_gain": float(r.elevation_gain) if r.elevation_gain else 0,
         }
 
     return {
         "type": "yearly_stats",
         "data": data,
-        "fetched_at": datetime.now().isoformat()
+        "fetched_at": datetime.now().isoformat(),
     }
 
 
@@ -354,7 +359,7 @@ def get_all_activities_endpoint(
     offset: int = 0,
     year: int = None,
     activity_type: str = None,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     """
     Get all activities from history with pagination and filtering.
@@ -362,8 +367,8 @@ def get_all_activities_endpoint(
     query = db.query(StravaActivity).order_by(desc(StravaActivity.start_date))
 
     if year:
-        query = query.filter(extract('year', StravaActivity.start_date_local) == year)
-    
+        query = query.filter(extract("year", StravaActivity.start_date_local) == year)
+
     if activity_type:
         query = query.filter(StravaActivity.type == activity_type)
 
@@ -374,7 +379,7 @@ def get_all_activities_endpoint(
         "total": total,
         "limit": limit,
         "offset": offset,
-        "data": [a.to_dict() for a in activities]
+        "data": [a.to_dict() for a in activities],
     }
 
 
@@ -389,9 +394,7 @@ def refresh_data(api_key: str = Depends(get_api_key)):
         return {"status": "success", "message": "Data refreshed successfully"}
     except Exception as e:
         sanitized_msg, error_id = log_and_sanitize_error(
-            e,
-            "Data refresh",
-            "Failed to refresh Strava data"
+            e, "Data refresh", "Failed to refresh Strava data"
         )
         raise HTTPException(status_code=500, detail=sanitized_msg)
 
