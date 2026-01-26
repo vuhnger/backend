@@ -138,7 +138,6 @@
                         statusEl.innerText = 'TILGJENGELIG';
                         statusEl.classList.add('online');
 
-                        // Optional: Add DB info if available
                         if (data.database) {
                             document.getElementById(`meta-${service.id}`).innerText += ` • DB: ${data.database}`;
                         }
