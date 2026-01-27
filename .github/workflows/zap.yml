@@ -1,0 +1,14 @@
+name: ZAP Scan
+
+on:
+  workflow_dispatch:
+  # or schedule / push / pull_request
+
+jobs:
+  zap_scan:
+    runs-on: ubuntu-latest
+    steps:
+      - name: ZAP Full Scan
+        uses: zaproxy/action-full-scan@v0.13.0
+        with:
+          target: https://your-app.example.com
