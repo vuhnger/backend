@@ -1,18 +1,35 @@
 
 # vuhnger/backend
 
-FastAPI backend for Strava activity tracking with OAuth, cached statistics, and encrypted token storage.
+Multi-service FastAPI backend powering [vuhnger.dev](https://vuhnger.dev). Runs as Docker containers behind Caddy reverse proxy on NREC (Norwegian Research and Education Cloud).
+
+### Services
+
+| Service | Port | Description |
+|---------|------|-------------|
+| **strava-api** | 5001 | Strava activity tracking with OAuth, cached statistics, and encrypted token storage |
+| **wakatime-api** | 5002 | WakaTime coding statistics with OAuth and cached aggregates |
+| **projects-api** | 5005 | Project portfolio with image uploads |
+| **n8n-api** | 5004 | Webhook receiver for n8n automations |
+
+### Infrastructure
+
+- **Host**: NREC OpenStack VM (Rocky Linux)
+- **Reverse proxy**: Caddy with automatic Let's Encrypt SSL
+- **Database**: PostgreSQL 16 (shared across services)
+- **Scheduling**: Cron jobs for hourly data refresh (Strava + WakaTime)
+- **Domain**: `api.vuhnger.dev` with path-based routing
 
 ## Features
 
-- OAuth 2.0 integration with automatic token refresh
+- OAuth 2.0 integration with automatic token refresh (Strava + WakaTime)
 - Full historic activity storage for detailed aggregation
 - Hourly cached statistics (YTD, recent activities, monthly aggregates)
 - Encrypted tokens at rest (Fernet AES-128)
 - CSRF-protected OAuth flow (128-bit HMAC)
 - Race-condition-free database operations
 - CORS configured for frontend integration
-- 
+- Rate limiting via Caddy (60 req/min per IP)
 
 ## Quick Start
 
@@ -189,20 +206,21 @@ This exchanges your Strava credentials for access tokens.
 
 ### Step 7: Setup Automatic Data Refresh (Optional)
 
-The API caches your Strava data to reduce API calls. Set up a cron job to refresh it hourly.
+The API caches Strava and WakaTime data to reduce external API calls. Set up cron jobs to refresh hourly.
 
 ```bash
 # Open crontab editor
 crontab -e
 
-# Add this line (runs every hour at :00)
+# Add these lines (runs every hour at :00)
 0 * * * * docker exec backend-strava-api-1 python3 -m apps.strava.tasks >> /var/log/strava.log 2>&1
+0 * * * * docker exec backend-wakatime-api-1 python3 -m apps.wakatime.tasks >> /var/log/wakatime.log 2>&1
 ```
 
 **What this does**:
-- Fetches fresh data from Strava API every hour
+- Fetches fresh data from Strava and WakaTime APIs every hour
 - Updates cached YTD stats, recent activities, and monthly aggregates
-- Logs output to `/var/log/strava.log` for debugging
+- Logs output to `/var/log/strava.log` and `/var/log/wakatime.log` for debugging
 
 **Alternative**: Manually refresh anytime:
 ```bash
@@ -770,23 +788,44 @@ crontab -e
 ## Architecture
 
 ```
-┌─────────────┐
-│   Caddy     │ HTTPS/SSL
-│   :443      │
-└──────┬──────┘
-       │
-       ▼
-┌─────────────┐     ┌──────────────┐
-│ strava-api  │────▶│  PostgreSQL  │
-│   :5001     │     │    :5432     │
-└─────────────┘     └──────────────┘
-       │
-       ▼
-┌─────────────┐
-│  Strava API │
-│  (OAuth)    │
-└─────────────┘
+                    ┌─────────────────┐
+                    │      Caddy      │  HTTPS/SSL (auto Let's Encrypt)
+                    │      :443       │
+                    └────────┬────────┘
+                             │
+            ┌────────────────┼────────────────┬──────────────────┐
+            │                │                │                  │
+     /strava/*          /wakatime/*      /projects/*         /n8n/*
+            │                │                │                  │
+            ▼                ▼                ▼                  ▼
+    ┌──────────────┐ ┌──────────────┐ ┌──────────────┐ ┌──────────────┐
+    │  strava-api  │ │ wakatime-api │ │ projects-api │ │   n8n-api    │
+    │    :5001     │ │    :5002     │ │    :5005     │ │    :5004     │
+    └──────┬───────┘ └──────┬───────┘ └──────┬───────┘ └──────────────┘
+           │                │                │
+           └────────────────┼────────────────┘
+                            │
+                    ┌───────▼───────┐
+                    │  PostgreSQL   │
+                    │    :5432      │
+                    └───────────────┘
 ```
+
+All services run as Docker containers on a single host. Caddy handles TLS termination
+and routes requests to the correct backend based on URL path. All API containers bind
+to `127.0.0.1` only — not exposed to the internet directly.
+
+### Caddy Routing (api.vuhnger.dev)
+
+| Path | Backend | Port |
+|------|---------|------|
+| `/strava/*` | strava-api | 5001 |
+| `/wakatime/*` | wakatime-api | 5002 |
+| `/n8n/*` | n8n-api | 5004 |
+| `/projects/*` | projects-api | 5005 |
+| `/uploads/*` | Static file server | - |
+
+Rate limit: 60 requests/min per IP (Caddy `rate_limit` plugin).
 
 ## Security
 
@@ -887,17 +926,24 @@ FRONTEND_URL=https://yourdomain.com
 ## Common Commands
 
 ```bash
-# View logs
+# View logs (per service)
 docker compose logs -f strava-api
+docker compose logs -f wakatime-api
+docker compose logs -f projects-api
+docker compose logs -f n8n-api
 
 # Manual data refresh
 docker compose exec strava-api python3 -m apps.strava.tasks
+docker compose exec wakatime-api python3 -m apps.wakatime.tasks
 
 # Database shell
 docker compose exec db psql -U backend_user -d backend_db
 
-# Restart API
+# Restart a single service
 docker compose restart strava-api
+
+# Restart all services
+docker compose restart
 
 # Clean rebuild
 docker compose down
@@ -905,6 +951,10 @@ docker compose up -d --build
 
 # Check resource usage
 docker stats
+
+# Check Caddy config and status
+sudo systemctl status caddy
+cat /etc/caddy/Caddyfile
 ```
 
 ## Development
