@@ -1,0 +1,35 @@
+[project]
+name = "backend"
+version = "0.1.0"
+description = "Personal backend services (Strava, WakaTime, n8n, projects)"
+requires-python = ">=3.11,<3.12"
+dependencies = [
+    # FastAPI and web server
+    "fastapi==0.109.0",
+    "uvicorn[standard]==0.27.0",
+    # Database
+    "sqlalchemy==2.0.25",
+    "psycopg2-binary==2.9.9",
+    # External APIs
+    "stravalib==1.6.0",
+    "requests==2.33.0",
+    "httpx==0.27.0",
+    # Security
+    "cryptography==48.0.1",
+    # File handling
+    "aiofiles==24.1.0",
+    "python-multipart==0.0.31",
+]
+
+[dependency-groups]
+# Test tooling. pytest-asyncio must track pytest's major line — 0.23.x caps at
+# pytest<9, which is what broke the old requirements.txt. >=1.0 supports pytest 9.
+dev = [
+    "pytest==9.0.3",
+    "pytest-asyncio>=1.0",
+]
+
+[tool.uv]
+# The apps are run as modules (uvicorn apps.x.main:app) from the source tree,
+# not installed as a distribution — so only resolve/install dependencies.
+package = false
