@@ -1,8 +1,8 @@
 name: Deploy til server
 
 # Deploy only after CI succeeds on main — a red build must never reach the
-# server. workflow_run fires when the "CI" workflow finishes; the job guard
-# below restricts it to successful runs triggered by a push to main.
+# server. workflow_run fires when the "CI" workflow finishes; the job guards
+# below restrict it to successful runs triggered by a push to main.
 on:
   workflow_run:
     workflows: ["CI"]
@@ -11,16 +11,55 @@ on:
 
 permissions:
   contents: read
+  packages: write # push the image to GHCR
+
+env:
+  IMAGE: ghcr.io/${{ github.repository }} # ghcr.io/vuhnger/backend
 
 jobs:
-  deploy:
-    name: Deploy til nrec
+  # 1) Build the image once, in CI, and push it to GHCR. The server no longer
+  #    builds on the production host (slow, non-reproducible, competes for RAM).
+  build-and-push:
+    name: Build & push image
     runs-on: ubuntu-latest
     if: >-
       github.event.workflow_run.conclusion == 'success' &&
       github.event.workflow_run.event == 'push' &&
       github.event.workflow_run.head_branch == 'main'
+    outputs:
+      sha: ${{ github.event.workflow_run.head_sha }}
+    steps:
+      - name: Checkout the exact commit CI validated
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
 
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          # Tag with the immutable commit SHA (for rollback) and moving `latest`
+          # (what the compose file pulls by default).
+          tags: |
+            ${{ env.IMAGE }}:${{ github.event.workflow_run.head_sha }}
+            ${{ env.IMAGE }}:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # 2) Pull the freshly built image on the server and roll the services. No
+  #    `down`, no `--build`: `up -d` recreates only changed containers.
+  deploy:
+    name: Deploy til nrec
+    needs: build-and-push
+    runs-on: ubuntu-latest
     steps:
       - name: Deploy via SSH
         uses: appleboy/ssh-action@v1.0.3
@@ -29,9 +68,16 @@ jobs:
           username: ${{ secrets.SSH_USERNAME }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           port: ${{ secrets.SSH_PORT || 22 }}
+          # BACKEND_TAG defaults to `latest`; set it to a SHA to pin/rollback.
           script: |
+            set -euo pipefail
             cd backend
             git pull origin main
-            docker compose down
-            docker compose up -d --build
-            docker compose logs --tail=50
+            echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+            docker compose pull
+            # Apply DB migrations before starting the new code (see alembic/README
+            # for the one-time `alembic stamp head` needed to adopt Alembic).
+            docker compose run --rm strava-api alembic upgrade head
+            docker compose up -d
+            docker image prune -f
+            docker compose ps

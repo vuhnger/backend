@@ -17,7 +17,7 @@ services:
       retries: 5
 
   strava-api:
-    build: .
+    image: ghcr.io/vuhnger/backend:${BACKEND_TAG:-latest}
     command: ["uvicorn", "apps.strava.main:app", "--host", "0.0.0.0", "--port", "5001"]
     restart: unless-stopped
     ports:
@@ -48,7 +48,7 @@ services:
       - backend
 
   n8n-api:
-    build: .
+    image: ghcr.io/vuhnger/backend:${BACKEND_TAG:-latest}
     command: ["uvicorn", "apps.n8n.main:app", "--host", "0.0.0.0", "--port", "5004"]
     restart: unless-stopped
     ports:
@@ -59,7 +59,7 @@ services:
       - backend
 
   wakatime-api:
-    build: .
+    image: ghcr.io/vuhnger/backend:${BACKEND_TAG:-latest}
     command: ["uvicorn", "apps.wakatime.main:app", "--host", "0.0.0.0", "--port", "5002"]
     restart: unless-stopped
     ports:
@@ -81,7 +81,7 @@ services:
       - backend
 
   projects-api:
-    build: .
+    image: ghcr.io/vuhnger/backend:${BACKEND_TAG:-latest}
     command: ["uvicorn", "apps.projects.main:app", "--host", "0.0.0.0", "--port", "5005"]
     restart: unless-stopped
     ports:
