@@ -29,13 +29,13 @@ def get_ytd_stats(db: Session) -> Dict[str, Dict[str, Any]]:
         "run": {
             "count": ytd_run.count,
             "distance": float(ytd_run.distance),  # meters
-            "moving_time": int(ytd_run.moving_time.total_seconds()) if ytd_run.moving_time else 0,  # seconds
+            "moving_time": int(ytd_run.moving_time) if ytd_run.moving_time else 0,  # seconds
             "elevation_gain": float(ytd_run.elevation_gain)  # meters
         },
         "ride": {
             "count": ytd_ride.count,
             "distance": float(ytd_ride.distance),
-            "moving_time": int(ytd_ride.moving_time.total_seconds()) if ytd_ride.moving_time else 0,  # seconds
+            "moving_time": int(ytd_ride.moving_time) if ytd_ride.moving_time else 0,  # seconds
             "elevation_gain": float(ytd_ride.elevation_gain)
         }
     }
@@ -57,9 +57,9 @@ def get_recent_activities(db: Session, limit: int = 30) -> List[Dict[str, Any]]:
         result.append({
             "id": activity.id,
             "name": activity.name,
-            "type": activity.type,
+            "type": activity.type.root if activity.type else None,
             "distance": float(activity.distance) if activity.distance else 0,  # meters
-            "moving_time": int(activity.moving_time.total_seconds()) if activity.moving_time else 0,  # seconds
+            "moving_time": int(activity.moving_time) if activity.moving_time else 0,  # seconds
             "elevation_gain": float(activity.total_elevation_gain) if activity.total_elevation_gain else 0,
             "start_date": activity.start_date.isoformat() if activity.start_date else None
         })
@@ -98,7 +98,7 @@ def get_monthly_stats(db: Session, months: int = 12) -> Dict[str, Dict[str, Any]
                 float(activity.distance) if activity.distance else 0
             )
             monthly_data[month_key]["moving_time"] += (
-                int(activity.moving_time.total_seconds()) if activity.moving_time else 0
+                int(activity.moving_time) if activity.moving_time else 0
             )
             monthly_data[month_key]["elevation_gain"] += (
                 float(activity.total_elevation_gain) if activity.total_elevation_gain else 0
@@ -127,10 +127,10 @@ def get_all_activities(db: Session, limit: int = None):
         yield {
             "id": activity.id,
             "name": activity.name,
-            "type": activity.type,
+            "type": activity.type.root if activity.type else None,
             "distance": float(activity.distance) if activity.distance else 0.0,
-            "moving_time": int(activity.moving_time.total_seconds()) if activity.moving_time else 0,
-            "elapsed_time": int(activity.elapsed_time.total_seconds()) if activity.elapsed_time else 0,
+            "moving_time": int(activity.moving_time) if activity.moving_time else 0,
+            "elapsed_time": int(activity.elapsed_time) if activity.elapsed_time else 0,
             "total_elevation_gain": float(activity.total_elevation_gain) if activity.total_elevation_gain else 0.0,
             "start_date": activity.start_date,
             "start_date_local": activity.start_date_local,
