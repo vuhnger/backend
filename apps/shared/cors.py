@@ -36,8 +36,10 @@ def get_allowed_origins() -> list[str]:
         if clean_url not in origins:
             origins.append(clean_url)
 
-    # Alltid inkluder dev-origins (for lokal frontend-utvikling mot prod API)
-    origins.extend(DEV_ORIGINS)
+    # Localhost-origins kun utenfor produksjon. I prod har de ingenting å gjøre
+    # (med allow_credentials=True er en localhost-origin en unødvendig åpning).
+    if os.getenv("ENVIRONMENT", "development") != "production":
+        origins.extend(DEV_ORIGINS)
 
     # Legg til ekstra origins
     origins.extend(EXTRA_ORIGINS)

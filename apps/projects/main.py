@@ -6,14 +6,15 @@ CRUD endpoints for portfolio projects with image upload support.
 import os
 import logging
 import aiofiles
+import filetype
 from uuid import uuid4
-from fastapi import FastAPI, APIRouter, Depends, HTTPException, UploadFile, File
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 
 from apps.shared.database import get_db, check_db_connection
 from apps.shared.auth import get_api_key
-from apps.shared.cors import setup_cors
+from apps.shared.app_factory import create_app
 from apps.projects.models import Project
 from apps.projects.schemas import (
     ProjectCreate,
@@ -33,16 +34,13 @@ UPLOAD_BASE_URL = os.getenv("UPLOAD_BASE_URL", "https://api.vuhnger.dev/uploads/
 ALLOWED_TYPES = {"image/jpeg", "image/png", "image/webp", "image/gif"}
 MAX_FILE_SIZE = 10 * 1024 * 1024  # 10 MB
 
-app = FastAPI(
+# Hardened app: CORS, cache-control, security headers, and locally-served docs
+# (matches the other services; a strict CSP would block CDN-hosted Swagger).
+app = create_app(
     title="Projects API",
-    version="1.0.0",
+    url_prefix="projects",
     description="Portfolio projects management with image uploads",
-    docs_url="/projects/docs",
-    openapi_url="/projects/openapi.json",
 )
-
-# Setup CORS from shared configuration
-setup_cors(app)
 
 router = APIRouter(prefix="/projects", tags=["projects"])
 
@@ -87,6 +85,19 @@ def list_featured_projects(db: Session = Depends(get_db)):
         .all()
     )
     return projects
+
+
+@router.get("/admin", include_in_schema=False)
+def admin_panel():
+    """Serve the admin panel HTML.
+
+    Registered before the /{slug} route below — otherwise FastAPI matches the
+    dynamic route first and 'admin' is swallowed as a project slug (404).
+    """
+    admin_path = os.path.join(os.path.dirname(__file__), "..", "..", "static", "admin.html")
+    if not os.path.exists(admin_path):
+        raise HTTPException(status_code=404, detail="Admin panel not found")
+    return FileResponse(admin_path)
 
 
 @router.get("/{slug}", response_model=ProjectResponse)
@@ -204,24 +215,36 @@ async def upload_image(
     Upload an image for a project.
     Returns the public URL of the uploaded image.
     """
-    # Validate file type
+    too_large = f"File too large. Max size: {MAX_FILE_SIZE // (1024 * 1024)} MB"
+
+    # Reject oversized uploads before buffering the whole body into memory.
+    # UploadFile.size comes from the multipart part length when the client sends it.
+    if file.size is not None and file.size > MAX_FILE_SIZE:
+        raise HTTPException(status_code=400, detail=too_large)
+
+    # The declared content-type is client-controlled; treat it as a first filter
+    # only, then confirm against the real bytes below.
     if file.content_type not in ALLOWED_TYPES:
         raise HTTPException(
             status_code=400,
-            detail=f"Invalid file type. Allowed: {', '.join(ALLOWED_TYPES)}",
+            detail=f"Invalid file type. Allowed: {', '.join(sorted(ALLOWED_TYPES))}",
         )
 
-    # Read file and check size
     contents = await file.read()
-    if len(contents) > MAX_FILE_SIZE:
+    if len(contents) > MAX_FILE_SIZE:  # size wasn't advertised — enforce after read
+        raise HTTPException(status_code=400, detail=too_large)
+
+    # Validate the real bytes, not the client's content-type header, with the
+    # `filetype` library. Also take the extension from the detected type so a
+    # hostile filename can't drive what we write to disk.
+    kind = filetype.guess(contents)
+    if kind is None or kind.mime not in ALLOWED_TYPES:
         raise HTTPException(
             status_code=400,
-            detail=f"File too large. Max size: {MAX_FILE_SIZE // (1024*1024)} MB",
+            detail="File content is not a valid JPEG, PNG, WebP or GIF image",
         )
 
-    # Generate unique filename
-    ext = file.filename.split(".")[-1] if "." in file.filename else "jpg"
-    filename = f"{uuid4().hex}.{ext}"
+    filename = f"{uuid4().hex}.{kind.extension}"
     filepath = os.path.join(UPLOAD_DIR, filename)
 
     # Ensure upload directory exists
@@ -237,19 +260,6 @@ async def upload_image(
         url=f"{UPLOAD_BASE_URL}/{filename}",
         filename=filename,
     )
-
-
-# ──────────────────────────────────────────────────────────────────────────────
-# Admin panel (static HTML)
-# ──────────────────────────────────────────────────────────────────────────────
-
-@router.get("/admin", include_in_schema=False)
-def admin_panel():
-    """Serve the admin panel HTML."""
-    admin_path = os.path.join(os.path.dirname(__file__), "..", "..", "static", "admin.html")
-    if not os.path.exists(admin_path):
-        raise HTTPException(status_code=404, detail="Admin panel not found")
-    return FileResponse(admin_path)
 
 
 app.include_router(router)
