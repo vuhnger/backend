@@ -124,6 +124,27 @@ services:
     networks:
       - backend
 
+  # Visitor beacon → pushes a notification on a new visit (no DB; ntfy via config).
+  site-api:
+    image: ghcr.io/vuhnger/backend:${BACKEND_TAG:-latest}
+    command: ["uvicorn", "apps.site.main:app", "--host", "0.0.0.0", "--port", "5006"]
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:5006:5006"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:5006/site/openapi.json', timeout=4).status==200 else 1)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    environment:
+      ENVIRONMENT: ${ENVIRONMENT:-development}
+      NTFY_URL: ${NTFY_URL}
+      VISIT_NOTIFY_THROTTLE_SECONDS: ${VISIT_NOTIFY_THROTTLE_SECONDS:-3600}
+      VISIT_NOTIFY_EXCLUDE_IPS: ${VISIT_NOTIFY_EXCLUDE_IPS:-}
+    networks:
+      - backend
+
   # Restarts any container Docker marks 'unhealthy' — the liveness-probe behaviour
   # that `restart: unless-stopped` doesn't cover (a hung-but-not-exited process).
   # Watches the per-service healthchecks defined above. Single-host alternative to
