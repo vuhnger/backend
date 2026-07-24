@@ -11,7 +11,7 @@ from fastapi import FastAPI, APIRouter, Depends, HTTPException, UploadFile, File
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 
-from apps.shared.database import get_db, Base, engine, check_db_connection
+from apps.shared.database import get_db, check_db_connection
 from apps.shared.auth import get_api_key
 from apps.shared.cors import setup_cors
 from apps.projects.models import Project
@@ -24,8 +24,8 @@ from apps.projects.schemas import (
 
 logger = logging.getLogger(__name__)
 
-# Create tables
-Base.metadata.create_all(bind=engine)
+# Schema is managed by Alembic migrations (`alembic upgrade head`), not created
+# at import time. See alembic/ and `make migrate`.
 
 # Upload configuration
 UPLOAD_DIR = os.getenv("UPLOAD_DIR", "/home/rocky/uploads/projects")

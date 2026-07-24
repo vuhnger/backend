@@ -1,0 +1,35 @@
+Alembic database migrations
+===========================
+
+Single shared schema across all apps. `alembic/env.py` reads DATABASE_URL from
+the environment and imports every app's models onto the one shared Base, so a
+single migration tree covers strava, wakatime and projects.
+
+Everyday usage (via the Makefile, which runs alembic inside an app container):
+
+    make migrate                     # apply all pending migrations (upgrade head)
+    make migration name="add x"      # autogenerate a migration from model changes
+    make migrate-down                # roll back the most recent migration
+
+`make dev-up` runs `make migrate` automatically, so a fresh local stack ends up
+fully schema'd.
+
+Adopting Alembic on a database that ALREADY has the tables
+----------------------------------------------------------
+The apps used to build tables with `Base.metadata.create_all()` at import. An
+existing database (e.g. production) therefore already has every table but no
+`alembic_version` row. Running `upgrade head` there would try to re-create the
+tables and fail. Adopt Alembic ONCE with:
+
+    make db-stamp                    # local dev DB
+    # production: run `alembic stamp head` once in the app container/host
+
+After stamping, all future deploys simply run `alembic upgrade head`.
+
+Authoring new migrations
+------------------------
+1. Change the SQLAlchemy models under apps/<service>/models.py.
+2. `make migration name="describe change"`.
+3. Review the generated file in alembic/versions/ (autogenerate is a starting
+   point, not gospel — check data migrations, server defaults, enum changes).
+4. `make migrate` to apply locally; commit the version file.

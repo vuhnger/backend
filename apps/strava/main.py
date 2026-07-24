@@ -14,7 +14,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import desc, extract, func
 from stravalib.client import Client
 
-from apps.shared.database import get_db, Base, engine, check_db_connection
+from apps.shared.database import get_db, check_db_connection
 from apps.shared.auth import get_api_key
 from apps.shared.app_factory import create_app
 from apps.shared.oauth_state import generate_state, validate_state
@@ -24,8 +24,8 @@ from apps.strava.tasks import fetch_and_cache_stats
 
 logger = logging.getLogger(__name__)
 
-# Create database tables
-Base.metadata.create_all(bind=engine)
+# Schema is managed by Alembic migrations (`alembic upgrade head`), not created
+# at import time. See alembic/ and `make migrate`.
 
 app = create_app(
     title="Strava Service",
