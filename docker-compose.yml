@@ -138,6 +138,25 @@ services:
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
 
+  # Self-hosted, cookieless web analytics. Reuses the existing Postgres via a
+  # dedicated `umami` database (create it once: CREATE DATABASE umami;). Serves
+  # the dashboard + tracking script on :3000 — front it with caddy on a subdomain
+  # (e.g. analytics.vuhnger.dev). Ships its own healthcheck, so autoheal watches it.
+  umami:
+    image: ghcr.io/umami-software/umami:postgresql-latest
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:3000:3000"
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-backend_user}:${POSTGRES_PASSWORD:-changeme}@db:5432/umami
+      DATABASE_TYPE: postgresql
+      APP_SECRET: ${UMAMI_APP_SECRET}
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - backend
+
 networks:
   backend:
 
