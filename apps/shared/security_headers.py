@@ -11,17 +11,21 @@ Konsoliderer issues #25 (CSP), #26 (X-Frame-Options), #29 (HSTS) og
 from fastapi import FastAPI, Request
 from fastapi.responses import Response
 
-# Content-Security-Policy.
+# Content-Security-Policy (streng, global default).
 #
-# 'unsafe-inline' for script/style kreves av Swagger UI (inline init-script og
-# injiserte stiler). Assets serveres lokalt fra /static (se swagger_ui.py), så
-# vi trenger ikke å whiteliste noen ekstern CDN. img/font tillater data: og
-# https: for Swagger sine ikoner/favicon.
+# script-src holdes på 'self' uten 'unsafe-inline' slik at inline JavaScript
+# ikke kan kjøre på API- og landingssidene — dette er den viktigste XSS-
+# beskyttelsen. Swagger UI trenger inline-script og setter derfor sin egen,
+# løsere CSP kun på docs-responsen (se swagger_ui.py); siden middleware bruker
+# setdefault overstyres ikke den route-spesifikke verdien.
+#
+# style-src beholder 'unsafe-inline' (inline-stiler er lav risiko og brukes av
+# landingssidene). Alle assets serveres lokalt, så ingen ekstern CDN whitelistes.
 DEFAULT_CSP = (
     "default-src 'self'; "
-    "img-src 'self' data: https:; "
-    "font-src 'self' data: https:; "
-    "script-src 'self' 'unsafe-inline'; "
+    "img-src 'self' data:; "
+    "font-src 'self' data:; "
+    "script-src 'self'; "
     "style-src 'self' 'unsafe-inline'; "
     "connect-src 'self'"
 )

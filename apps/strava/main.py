@@ -38,6 +38,7 @@ app = FastAPI(
     version="1.0.0",
     description="Strava OAuth integration with cached activity statistics",
     docs_url=None,
+    redoc_url=None,
     openapi_url="/strava/openapi.json",
 )
 

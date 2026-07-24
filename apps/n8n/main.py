@@ -22,6 +22,7 @@ app = FastAPI(
     version="1.0.0",
     description="Health check proxy for n8n automation platform",
     docs_url=None,
+    redoc_url=None,
     openapi_url="/n8n/openapi.json",
 )
 

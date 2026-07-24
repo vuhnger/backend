@@ -34,6 +34,7 @@ app = FastAPI(
     version="1.0.0",
     description="WakaTime OAuth integration and cached stats",
     docs_url=None,
+    redoc_url=None,
     openapi_url="/wakatime/openapi.json",
 )
 
