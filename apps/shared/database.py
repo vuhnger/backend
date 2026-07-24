@@ -6,7 +6,7 @@ NO models are defined here - this is just infrastructure.
 """
 
 from sqlalchemy import create_engine, text
-from sqlalchemy.orm import sessionmaker, declarative_base
+from sqlalchemy.orm import declarative_base, sessionmaker
 
 from apps.shared.config import settings
 

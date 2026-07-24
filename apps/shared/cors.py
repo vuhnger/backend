@@ -5,7 +5,6 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from apps.shared.config import settings
 
-
 # Produksjons-origins (alltid tillatt)
 PRODUCTION_ORIGINS = [
     "https://vuhnger.dev",

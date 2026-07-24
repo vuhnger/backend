@@ -5,12 +5,12 @@ Provides symmetric encryption for OAuth tokens at rest using Fernet (AES-128-CBC
 """
 
 import base64
+
 from cryptography.fernet import Fernet
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 
 from apps.shared.config import settings
-
 
 # Get encryption key from environment
 ENCRYPTION_KEY = settings.encryption_key

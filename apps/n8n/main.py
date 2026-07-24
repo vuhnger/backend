@@ -5,6 +5,7 @@ Provides a health check endpoint that verifies n8n.vuhnger.dev is operational.
 """
 
 import logging
+
 import httpx
 from fastapi import APIRouter
 

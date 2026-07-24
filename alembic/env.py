@@ -11,16 +11,16 @@ from logging.config import fileConfig
 
 from sqlalchemy import engine_from_config, pool
 
-from alembic import context
-
-# Shared declarative Base — every app's models attach their tables to this.
-from apps.shared.database import Base
+import apps.projects.models  # noqa: F401
 
 # Importing the model modules registers their tables on Base.metadata.
 # (n8n has no models, so it is intentionally absent.)
 import apps.strava.models  # noqa: F401
 import apps.wakatime.models  # noqa: F401
-import apps.projects.models  # noqa: F401
+from alembic import context
+
+# Shared declarative Base — every app's models attach their tables to this.
+from apps.shared.database import Base
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.

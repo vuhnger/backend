@@ -7,19 +7,20 @@ Single user mode - stores one set of tokens and serves cached data.
 
 import logging
 from datetime import datetime
+
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
-from fastapi.responses import RedirectResponse, FileResponse
-from sqlalchemy.orm import Session
+from fastapi.responses import FileResponse, RedirectResponse
 from sqlalchemy import desc, extract, func
+from sqlalchemy.orm import Session
 from stravalib.client import Client
 
-from apps.shared.config import settings
-from apps.shared.database import get_db, check_db_connection
-from apps.shared.auth import get_api_key
 from apps.shared.app_factory import create_app
-from apps.shared.oauth_state import generate_state, validate_state
+from apps.shared.auth import get_api_key
+from apps.shared.config import settings
+from apps.shared.database import check_db_connection, get_db
 from apps.shared.errors import log_and_sanitize_error
-from apps.strava.models import StravaAuth, StravaStats, StravaActivity
+from apps.shared.oauth_state import generate_state, validate_state
+from apps.strava.models import StravaActivity, StravaAuth, StravaStats
 from apps.strava.tasks import fetch_and_cache_stats
 
 logger = logging.getLogger(__name__)
@@ -127,8 +128,8 @@ def oauth_callback(
             athlete_id = athlete.id
 
         # Store in database (single user, id=1) using atomic upsert
-        from apps.shared.upsert import atomic_upsert_auth
         from apps.shared.encryption import encrypt_token
+        from apps.shared.upsert import atomic_upsert_auth
 
         # Encrypt tokens before storing (use database column names)
         atomic_upsert_auth(

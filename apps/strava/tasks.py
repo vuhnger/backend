@@ -2,13 +2,15 @@
 Background tasks for fetching and caching Strava data
 """
 import logging
-from typing import Dict, Any, List
-from sqlalchemy.orm import Session
+from typing import Any
+
 from sqlalchemy.dialects.postgresql import insert as pg_insert
+from sqlalchemy.orm import Session
+
 from apps.shared.database import SessionLocal
-from apps.strava.models import StravaStats, StravaActivity
-from apps.strava.client import get_ytd_stats, get_recent_activities, get_monthly_stats, get_all_activities
 from apps.shared.upsert import atomic_upsert_stats
+from apps.strava.client import get_all_activities, get_monthly_stats, get_recent_activities, get_ytd_stats
+from apps.strava.models import StravaActivity, StravaStats
 
 logger = logging.getLogger(__name__)
 
@@ -84,7 +86,7 @@ def sync_activities(db: Session):
     logger.info(f"Total activities synced: {count}")
 
 
-def _bulk_upsert_activities(db: Session, activities: List[Dict[str, Any]]):
+def _bulk_upsert_activities(db: Session, activities: list[dict[str, Any]]):
     """
     Helper to perform bulk upsert of activities
     """
@@ -107,7 +109,7 @@ def _bulk_upsert_activities(db: Session, activities: List[Dict[str, Any]]):
     db.execute(stmt)
 
 
-def upsert_stats(db: Session, stats_type: str, data: Dict[str, Any], commit: bool = True) -> None:
+def upsert_stats(db: Session, stats_type: str, data: dict[str, Any], commit: bool = True) -> None:
     """
     Atomic insert or update of cached stats using PostgreSQL ON CONFLICT.
 

@@ -43,19 +43,21 @@ Usage:
     atomic_upsert_stats(db, Model, 'key', value, {'data': new_data})
 """
 
-from sqlalchemy.orm import Session
-from sqlalchemy.dialects.postgresql import insert as pg_insert
+from typing import Any
+
 from sqlalchemy import func
-from typing import Type, Any, Dict
+from sqlalchemy.dialects.postgresql import insert as pg_insert
+from sqlalchemy.orm import Session
+
 from apps.shared.database import Base
 
 
 def atomic_upsert_stats(
     db: Session,
-    model: Type[Base],
+    model: type[Base],
     unique_field: str,
     unique_value: Any,
-    update_data: Dict[str, Any],
+    update_data: dict[str, Any],
     auto_update_timestamp: bool = True,
     timestamp_field: str = 'fetched_at'
 ) -> None:
@@ -125,8 +127,8 @@ def atomic_upsert_stats(
 
 def atomic_upsert_auth(
     db: Session,
-    model: Type[Base],
-    auth_data: Dict[str, Any],
+    model: type[Base],
+    auth_data: dict[str, Any],
     auto_update_timestamp: bool = True,
     timestamp_field: str = 'updated_at'
 ) -> None:

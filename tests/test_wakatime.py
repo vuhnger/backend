@@ -1,7 +1,7 @@
 from unittest.mock import MagicMock, patch
 
-from apps.wakatime.tasks import fetch_and_cache_wakatime_stats
 from apps.wakatime.models import WakaTimeAuth
+from apps.wakatime.tasks import fetch_and_cache_wakatime_stats
 
 
 @patch("apps.wakatime.tasks.atomic_upsert_stats")

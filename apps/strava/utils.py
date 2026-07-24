@@ -2,9 +2,11 @@
 Utility functions for Strava token management
 """
 import time
-from typing import Dict, Any
+from typing import Any
+
 import httpx
 from sqlalchemy.orm import Session
+
 from apps.shared.config import settings
 from apps.strava.models import StravaAuth
 
@@ -22,7 +24,7 @@ def needs_refresh(expires_at: int, buffer_seconds: int = 3600) -> bool:
     return time.time() >= (expires_at - buffer_seconds)
 
 
-def refresh_strava_token(db: Session) -> Dict[str, Any]:
+def refresh_strava_token(db: Session) -> dict[str, Any]:
     """
     Refresh Strava access token using refresh token.
     Returns new token data or raises exception.

@@ -3,7 +3,7 @@ Projects database models.
 
 Stores project information including metadata, images, and links.
 """
-from sqlalchemy import Column, Integer, String, Text, Boolean, DateTime, func
+from sqlalchemy import Boolean, Column, DateTime, Integer, String, Text, func
 from sqlalchemy.dialects.postgresql import JSONB
 
 from apps.shared.database import Base

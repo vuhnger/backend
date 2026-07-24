@@ -6,7 +6,6 @@ Provides utilities for handling errors securely without leaking sensitive inform
 
 import logging
 import uuid
-from typing import Optional
 
 logger = logging.getLogger(__name__)
 
@@ -14,7 +13,7 @@ logger = logging.getLogger(__name__)
 def log_and_sanitize_error(
     error: Exception,
     context: str,
-    user_message: Optional[str] = None
+    user_message: str | None = None
 ) -> tuple[str, str]:
     """
     Log full error details server-side and return sanitized message for client.

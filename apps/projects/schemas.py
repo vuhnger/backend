@@ -4,7 +4,7 @@ Pydantic schemas for Projects API.
 Defines request/response models with validation.
 """
 from datetime import datetime
-from typing import Optional
+
 from pydantic import BaseModel, ConfigDict, Field
 
 
@@ -12,9 +12,9 @@ class ProjectBase(BaseModel):
     """Base schema with common project fields."""
     title: str = Field(..., min_length=1, max_length=200)
     slug: str = Field(..., min_length=1, max_length=100, pattern=r"^[a-z0-9-]+$")
-    description: Optional[str] = None
-    content: Optional[str] = None
-    image_url: Optional[str] = None
+    description: str | None = None
+    content: str | None = None
+    image_url: str | None = None
     technologies: list[str] = Field(default_factory=list)
     links: dict[str, str] = Field(default_factory=dict)
     featured: bool = False
@@ -29,23 +29,23 @@ class ProjectCreate(ProjectBase):
 
 class ProjectUpdate(BaseModel):
     """Schema for updating a project. All fields optional."""
-    title: Optional[str] = Field(None, min_length=1, max_length=200)
-    slug: Optional[str] = Field(None, min_length=1, max_length=100, pattern=r"^[a-z0-9-]+$")
-    description: Optional[str] = None
-    content: Optional[str] = None
-    image_url: Optional[str] = None
-    technologies: Optional[list[str]] = None
-    links: Optional[dict[str, str]] = None
-    featured: Optional[bool] = None
-    order: Optional[int] = None
-    published: Optional[bool] = None
+    title: str | None = Field(None, min_length=1, max_length=200)
+    slug: str | None = Field(None, min_length=1, max_length=100, pattern=r"^[a-z0-9-]+$")
+    description: str | None = None
+    content: str | None = None
+    image_url: str | None = None
+    technologies: list[str] | None = None
+    links: dict[str, str] | None = None
+    featured: bool | None = None
+    order: int | None = None
+    published: bool | None = None
 
 
 class ProjectResponse(ProjectBase):
     """Schema for project responses."""
     id: int
-    created_at: Optional[datetime] = None
-    updated_at: Optional[datetime] = None
+    created_at: datetime | None = None
+    updated_at: datetime | None = None
 
     model_config = ConfigDict(from_attributes=True)
 

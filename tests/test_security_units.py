@@ -7,7 +7,6 @@ at rest and the HMAC-signed OAuth CSRF state.
 import apps.shared.oauth_state as st
 from apps.shared.encryption import decrypt_token, encrypt_token
 
-
 # --- encryption ------------------------------------------------------------
 
 def test_encrypt_decrypt_round_trip():
@@ -31,8 +30,8 @@ def test_empty_string_passthrough():
 
 
 def test_tampered_ciphertext_rejected():
-    from cryptography.fernet import InvalidToken
     import pytest
+    from cryptography.fernet import InvalidToken
 
     ciphertext = encrypt_token("secret")
     tampered = ciphertext[:-4] + ("AAAA" if ciphertext[-4:] != "AAAA" else "BBBB")
