@@ -1,0 +1,31 @@
+# Local pre-commit hooks that mirror the CI lint gate, so problems are caught
+# before they're pushed. Enable once with: `uv run pre-commit install`.
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: check-yaml
+      - id: check-toml
+      - id: check-merge-conflict
+      - id: check-added-large-files
+      - id: end-of-file-fixer
+        exclude: '^static/swagger-ui/'  # vendored third-party assets
+      - id: trailing-whitespace
+        exclude: '^static/swagger-ui/'
+
+  # ruff + mypy run through uv so they use the exact versions/config the project
+  # (and CI) pin — no separate hook-managed installs to drift.
+  - repo: local
+    hooks:
+      - id: ruff
+        name: ruff (lint + autofix)
+        entry: uv run ruff check --fix
+        language: system
+        types: [python]
+        require_serial: true
+      - id: mypy
+        name: mypy (apps/shared)
+        entry: uv run mypy
+        language: system
+        types: [python]
+        pass_filenames: false
