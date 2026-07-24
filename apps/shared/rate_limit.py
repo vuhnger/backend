@@ -40,6 +40,7 @@ def setup_rate_limiting(app: FastAPI) -> Limiter:
         headers_enabled=True,  # emit X-RateLimit-* response headers
     )
     app.state.limiter = limiter
-    app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+    # slowapi's handler signature is narrower than Starlette's generic type.
+    app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)  # type: ignore[arg-type]
     app.add_middleware(SlowAPIMiddleware)
     return limiter

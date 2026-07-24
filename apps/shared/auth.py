@@ -28,7 +28,7 @@ ENVIRONMENT = settings.environment
 api_key_header = APIKeyHeader(name=API_KEY_HEADER, auto_error=False)
 
 
-async def get_api_key(api_key: str = Security(api_key_header)) -> str:
+async def get_api_key(api_key: str = Security(api_key_header)) -> str | None:
     """
     Dependency to validate API key from header
 
@@ -72,7 +72,7 @@ class APIKeyMiddleware(BaseHTTPMiddleware):
     app.add_middleware(APIKeyMiddleware, exclude_paths=["/health", "/docs"])
     """
 
-    def __init__(self, app, exclude_paths: list[str] = None):
+    def __init__(self, app, exclude_paths: list[str] | None = None):
         super().__init__(app)
         self.exclude_paths = exclude_paths or []
 

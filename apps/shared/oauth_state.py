@@ -5,6 +5,7 @@ Provides secure per-request OAuth state generation and validation
 to prevent CSRF attacks in OAuth 2.0 flows.
 """
 import base64
+import binascii
 import hashlib
 import hmac
 import secrets
@@ -111,7 +112,7 @@ def validate_state(state: str) -> bool:
 
         return True
 
-    except (ValueError, UnicodeDecodeError, base64.binascii.Error):
+    except (ValueError, UnicodeDecodeError, binascii.Error):
         # Invalid format
         return False
 
