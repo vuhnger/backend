@@ -114,16 +114,19 @@ def get_monthly_stats(db: Session, months: int = 12) -> dict[str, dict[str, Any]
     return result
 
 
-def get_all_activities(db: Session, limit: int = None):
+def get_all_activities(db: Session, limit: int = None, after=None):
     """
-    Fetch all historic activities from Strava.
-    Yields activity data dictionaries suitable for StravaActivity model.
+    Fetch historic activities from Strava.
+
+    Yields activity data dictionaries suitable for StravaActivity model. When
+    ``after`` (a datetime) is given, only activities on/after that time are
+    fetched — used for incremental syncs so we don't re-download all history.
     """
     access_token = get_valid_token(db)
     client = Client(access_token=access_token)
 
-    # Get all activities (paginated automatically by stravalib)
-    activities = client.get_activities(limit=limit)
+    # Paginated automatically by stravalib; `after` narrows to recent activities.
+    activities = client.get_activities(limit=limit, after=after)
 
     for activity in activities:
         yield {

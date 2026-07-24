@@ -2,8 +2,10 @@
 Background tasks for fetching and caching Strava data
 """
 import logging
+from datetime import timedelta
 from typing import Any
 
+from sqlalchemy import func
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.orm import Session
 
@@ -15,21 +17,25 @@ from apps.strava.models import StravaActivity, StravaStats
 logger = logging.getLogger(__name__)
 
 
-def fetch_and_cache_stats():
+def fetch_and_cache_stats(full: bool = False):
     """
     Fetch all stats from Strava and cache in database.
     This function should be called by a cron job or scheduler.
 
     All stats are committed atomically - either all succeed or all fail.
+
+    Args:
+        full: force a full re-sync of all history instead of the default
+            incremental sync (only activities newer than what's stored).
     """
     db = SessionLocal()
 
     try:
         logger.info("Fetching Strava data...")
 
-        # Sync all historic activities
-        sync_activities(db)
-        logger.info("Synced all activities to database")
+        # Sync historic activities (incremental by default)
+        sync_activities(db, full=full)
+        logger.info("Synced activities to database")
 
         # Fetch YTD stats
         ytd_data = get_ytd_stats(db)
@@ -59,12 +65,23 @@ def fetch_and_cache_stats():
         db.close()
 
 
-def sync_activities(db: Session):
+def sync_activities(db: Session, full: bool = False):
     """
-    Fetch all activities and upsert them into the database.
-    Uses efficient bulk upsert.
+    Fetch activities from Strava and upsert them into the database.
+
+    By default this is *incremental*: it only fetches activities newer than the
+    most recent one already stored (minus a one-day overlap so same-day edits are
+    picked up; the upsert dedupes). Pass ``full=True`` to re-sync all history.
     """
-    activities_gen = get_all_activities(db)
+    after = None
+    if not full:
+        latest = db.query(func.max(StravaActivity.start_date)).scalar()
+        if latest is not None:
+            # Overlap by a day so a just-edited recent activity is re-fetched.
+            after = latest - timedelta(days=1)
+            logger.info(f"Incremental sync: fetching activities after {after.isoformat()}")
+
+    activities_gen = get_all_activities(db, after=after)
     
     count = 0
     batch = []
