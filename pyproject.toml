@@ -57,4 +57,4 @@ target-version = "py311"
 # Start enforceable and correctness-focused: pyflakes (undefined names, unused
 # imports — real breakage) + syntax errors. Style/upgrade rules can be added
 # later without blocking CI on pre-existing formatting choices.
-select = ["F", "E9"]
+select = ["F", "E9", "I", "UP"]

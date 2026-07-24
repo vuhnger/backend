@@ -4,12 +4,12 @@ Token Encryption Utilities
 Provides symmetric encryption for OAuth tokens at rest using Fernet (AES-128-CBC).
 """
 
-import os
 import base64
+import os
+
 from cryptography.fernet import Fernet
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
-
 
 # Get encryption key from environment
 ENCRYPTION_KEY = os.getenv("ENCRYPTION_KEY")

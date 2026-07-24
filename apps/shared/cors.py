@@ -1,9 +1,9 @@
 """Sentralisert CORS-konfigurasjon for alle backend-tjenester."""
 
 import os
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-
 
 # Produksjons-origins (alltid tillatt)
 PRODUCTION_ORIGINS = [

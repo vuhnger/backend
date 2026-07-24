@@ -5,10 +5,11 @@ Simple API key-based authentication for internal services.
 Checks for X-API-Key header and validates against environment variable.
 """
 
-import os
 import hmac
 import logging
-from fastapi import Request, HTTPException, status, Security
+import os
+
+from fastapi import HTTPException, Request, Security, status
 from fastapi.security import APIKeyHeader
 from starlette.middleware.base import BaseHTTPMiddleware
 

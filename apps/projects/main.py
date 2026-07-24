@@ -3,25 +3,26 @@ Projects API
 
 CRUD endpoints for portfolio projects with image upload support.
 """
-import os
 import logging
+import os
+from uuid import uuid4
+
 import aiofiles
 import filetype
-from uuid import uuid4
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 
-from apps.shared.database import get_db, check_db_connection
-from apps.shared.auth import get_api_key
-from apps.shared.app_factory import create_app
 from apps.projects.models import Project
 from apps.projects.schemas import (
-    ProjectCreate,
-    ProjectUpdate,
-    ProjectResponse,
     ImageUploadResponse,
+    ProjectCreate,
+    ProjectResponse,
+    ProjectUpdate,
 )
+from apps.shared.app_factory import create_app
+from apps.shared.auth import get_api_key
+from apps.shared.database import check_db_connection, get_db
 
 logger = logging.getLogger(__name__)
 

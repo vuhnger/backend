@@ -2,22 +2,23 @@
 WakaTime Service API
 """
 
-import os
 import logging
+import os
+
 import httpx
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session
 
-from apps.shared.database import get_db, check_db_connection
-from apps.shared.auth import get_api_key
 from apps.shared.app_factory import create_app
-from apps.shared.oauth_state import generate_state, validate_state
+from apps.shared.auth import get_api_key
+from apps.shared.database import check_db_connection, get_db
+from apps.shared.encryption import encrypt_token
 from apps.shared.errors import log_and_sanitize_error
+from apps.shared.oauth_state import generate_state, validate_state
+from apps.shared.upsert import atomic_upsert_auth
 from apps.wakatime.models import WakaTimeAuth, WakaTimeStats
 from apps.wakatime.tasks import fetch_and_cache_wakatime_stats
-from apps.shared.upsert import atomic_upsert_auth
-from apps.shared.encryption import encrypt_token
 
 logger = logging.getLogger(__name__)
 

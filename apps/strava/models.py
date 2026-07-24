@@ -1,10 +1,11 @@
 """
 Strava database models for OAuth tokens and cached statistics
 """
-from sqlalchemy import Column, Integer, BigInteger, String, DateTime, JSON, func, Float
 from cryptography.fernet import InvalidToken
+from sqlalchemy import JSON, BigInteger, Column, DateTime, Float, Integer, String, func
+
 from apps.shared.database import Base
-from apps.shared.encryption import encrypt_token, decrypt_token
+from apps.shared.encryption import decrypt_token, encrypt_token
 
 
 class StravaAuth(Base):

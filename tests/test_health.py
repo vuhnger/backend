@@ -8,7 +8,6 @@ execute there.
 """
 
 import pytest
-
 from fastapi.testclient import TestClient
 
 from apps.shared.database import check_db_connection
