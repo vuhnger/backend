@@ -377,13 +377,16 @@ def get_all_activities_endpoint(
 
 
 @router.post("/refresh-data")
-def refresh_data(api_key: str = Depends(get_api_key)):
+def refresh_data(full: bool = False, api_key: str = Depends(get_api_key)):
     """
     Manually trigger data refresh from Strava.
     Protected endpoint - requires X-API-Key header.
+
+    Pass `?full=true` to force a full re-sync of all history instead of the
+    default incremental sync.
     """
     try:
-        fetch_and_cache_stats()
+        fetch_and_cache_stats(full=full)
         return {"status": "success", "message": "Data refreshed successfully"}
     except Exception as e:
         sanitized_msg, error_id = log_and_sanitize_error(
