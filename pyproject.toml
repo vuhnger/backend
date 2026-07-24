@@ -20,6 +20,7 @@ dependencies = [
     # File handling
     "aiofiles==24.1.0",
     "python-multipart==0.0.31",
+    "alembic>=1.18.5",
 ]
 
 [dependency-groups]

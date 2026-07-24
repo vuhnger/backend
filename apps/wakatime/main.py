@@ -5,18 +5,13 @@ WakaTime Service API
 import os
 import logging
 import httpx
-from fastapi import FastAPI, APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import RedirectResponse
-from fastapi.staticfiles import StaticFiles
-from fastapi.openapi.docs import get_swagger_ui_oauth2_redirect_html
 from sqlalchemy.orm import Session
 
-from apps.shared.database import get_db, Base, engine, check_db_connection
+from apps.shared.database import get_db, check_db_connection
 from apps.shared.auth import get_api_key
-from apps.shared.cors import setup_cors
-from apps.shared.cache_control_headers import setup_cache_control
-from apps.shared.security_headers import setup_security_headers
-from apps.shared.swagger_ui import render_swagger_ui_html
+from apps.shared.app_factory import create_app
 from apps.shared.oauth_state import generate_state, validate_state
 from apps.shared.errors import log_and_sanitize_error
 from apps.wakatime.models import WakaTimeAuth, WakaTimeStats
@@ -26,41 +21,16 @@ from apps.shared.encryption import encrypt_token
 
 logger = logging.getLogger(__name__)
 
-# Create tables
-Base.metadata.create_all(bind=engine)
+# Schema is managed by Alembic migrations (`alembic upgrade head`), not created
+# at import time. See alembic/ and `make migrate`.
 
-app = FastAPI(
+app = create_app(
     title="WakaTime Service",
-    version="1.0.0",
+    url_prefix="wakatime",
     description="WakaTime OAuth integration and cached stats",
-    docs_url=None,
-    redoc_url=None,
-    openapi_url="/wakatime/openapi.json",
 )
 
-# Setup CORS from shared configuration
-setup_cors(app)
-setup_cache_control(app)
-setup_security_headers(app)
-
-# Serve Swagger UI assets locally (no third-party CDN) so a strict CSP applies.
-app.mount("/static", StaticFiles(directory="static"), name="static")
-
 router = APIRouter(prefix="/wakatime")
-
-
-@app.get("/wakatime/docs", include_in_schema=False)
-def swagger_ui_html():
-    return render_swagger_ui_html(
-        openapi_url=app.openapi_url,
-        title=app.title,
-        oauth2_redirect_url="/wakatime/docs/oauth2-redirect",
-    )
-
-
-@app.get("/wakatime/docs/oauth2-redirect", include_in_schema=False)
-def swagger_ui_redirect():
-    return get_swagger_ui_oauth2_redirect_html()
 
 
 @router.get("/health")

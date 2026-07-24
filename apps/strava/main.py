@@ -8,18 +8,15 @@ Single user mode - stores one set of tokens and serves cached data.
 import os
 import logging
 from datetime import datetime
-from fastapi import FastAPI, APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import RedirectResponse, FileResponse
 from sqlalchemy.orm import Session
 from sqlalchemy import desc, extract, func
 from stravalib.client import Client
 
-from apps.shared.database import get_db, Base, engine, check_db_connection
+from apps.shared.database import get_db, check_db_connection
 from apps.shared.auth import get_api_key
-from apps.shared.cors import setup_cors
-from apps.shared.cache_control_headers import setup_cache_control
-from apps.shared.security_headers import setup_security_headers
-from apps.shared.swagger_ui import render_swagger_ui_html
+from apps.shared.app_factory import create_app
 from apps.shared.oauth_state import generate_state, validate_state
 from apps.shared.errors import log_and_sanitize_error
 from apps.strava.models import StravaAuth, StravaStats, StravaActivity
@@ -27,28 +24,14 @@ from apps.strava.tasks import fetch_and_cache_stats
 
 logger = logging.getLogger(__name__)
 
-from fastapi.staticfiles import StaticFiles
-from fastapi.openapi.docs import get_swagger_ui_oauth2_redirect_html
+# Schema is managed by Alembic migrations (`alembic upgrade head`), not created
+# at import time. See alembic/ and `make migrate`.
 
-# Create database tables
-Base.metadata.create_all(bind=engine)
-
-app = FastAPI(
+app = create_app(
     title="Strava Service",
-    version="1.0.0",
+    url_prefix="strava",
     description="Strava OAuth integration with cached activity statistics",
-    docs_url=None,
-    redoc_url=None,
-    openapi_url="/strava/openapi.json",
 )
-
-# Setup CORS from shared configuration
-setup_cors(app)
-setup_cache_control(app)
-setup_security_headers(app)
-
-# Serve Swagger UI assets locally (no third-party CDN) so a strict CSP applies.
-app.mount("/static", StaticFiles(directory="static"), name="static")
 
 # Router setup
 router = APIRouter(prefix="/strava")
@@ -57,20 +40,6 @@ router = APIRouter(prefix="/strava")
 @app.get("/", response_class=FileResponse)
 def landing_page():
     return FileResponse("static/index.html")
-
-
-@app.get("/strava/docs", include_in_schema=False)
-def swagger_ui_html():
-    return render_swagger_ui_html(
-        openapi_url=app.openapi_url,
-        title=app.title,
-        oauth2_redirect_url="/strava/docs/oauth2-redirect",
-    )
-
-
-@app.get("/strava/docs/oauth2-redirect", include_in_schema=False)
-def swagger_ui_redirect():
-    return get_swagger_ui_oauth2_redirect_html()
 
 
 @router.get("/health")
