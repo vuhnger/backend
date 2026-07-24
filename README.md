@@ -6,13 +6,15 @@ FastAPI backend for Strava activity tracking with OAuth, cached statistics, and 
 ## Features
 
 - OAuth 2.0 integration with automatic token refresh
-- Full historic activity storage for detailed aggregation
+- Full historic activity storage with **incremental sync** (only new activities are fetched)
 - Hourly cached statistics (YTD, recent activities, monthly aggregates)
 - Encrypted tokens at rest (Fernet AES-128)
 - CSRF-protected OAuth flow (128-bit HMAC)
-- Race-condition-free database operations
+- Race-condition-free database operations, connection pooling, and Alembic migrations
+- **Versioned API** (`/v1/...`) with the bare paths kept as backward-compatible aliases
+- **Per-IP rate limiting**, security headers, and non-root containers
+- Centralized typed config (`pydantic-settings`) and structured JSON logging (`structlog`)
 - CORS configured for frontend integration
-- 
 
 ## Quick Start
 
@@ -87,6 +89,10 @@ Use the output to replace:
 - `<GENERATE_KEY>` → ENCRYPTION_KEY
 
 **Important**: Each key must be unique. Never reuse keys across variables or environments.
+
+> Optional settings — WakaTime OAuth, projects uploads, and tuning knobs
+> (`RATE_LIMIT_DEFAULT`, `DB_POOL_SIZE`, …) — all have sensible defaults and are
+> documented in [`.env.example`](.env.example).
 
 ### Step 4: Production Server Setup (Skip for Local Development)
 
@@ -200,13 +206,17 @@ crontab -e
 ```
 
 **What this does**:
-- Fetches fresh data from Strava API every hour
+- Fetches fresh data from Strava API every hour (**incremental** — only activities newer than what's stored, so it stays cheap)
 - Updates cached YTD stats, recent activities, and monthly aggregates
 - Logs output to `/var/log/strava.log` for debugging
 
 **Alternative**: Manually refresh anytime:
 ```bash
 curl -X POST https://api.yourdomain.com/strava/refresh-data \
+  -H "X-API-Key: your-INTERNAL_API_KEY"
+
+# Force a full re-sync of all history (rarely needed):
+curl -X POST "https://api.yourdomain.com/strava/refresh-data?full=true" \
   -H "X-API-Key: your-INTERNAL_API_KEY"
 ```
 
