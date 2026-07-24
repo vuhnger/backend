@@ -10,11 +10,11 @@ the security hardening can never silently drift between apps.
 """
 
 from fastapi import FastAPI
-from fastapi.staticfiles import StaticFiles
 from fastapi.openapi.docs import get_swagger_ui_oauth2_redirect_html
+from fastapi.staticfiles import StaticFiles
 
-from apps.shared.cors import setup_cors
 from apps.shared.cache_control_headers import setup_cache_control
+from apps.shared.cors import setup_cors
 from apps.shared.security_headers import setup_security_headers
 from apps.shared.swagger_ui import render_swagger_ui_html
 

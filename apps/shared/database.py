@@ -6,8 +6,9 @@ NO models are defined here - this is just infrastructure.
 """
 
 import os
+
 from sqlalchemy import create_engine, text
-from sqlalchemy.orm import sessionmaker, declarative_base
+from sqlalchemy.orm import declarative_base, sessionmaker
 
 # Get database URL from environment variable
 DATABASE_URL = os.getenv("DATABASE_URL")

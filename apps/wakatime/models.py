@@ -7,10 +7,11 @@ This module defines two tables:
 
 Follows the proven Strava integration pattern with WakaTime-specific adjustments.
 """
-from sqlalchemy import Column, Integer, String, DateTime, JSON, func
 from cryptography.fernet import InvalidToken
+from sqlalchemy import JSON, Column, DateTime, Integer, String, func
+
 from apps.shared.database import Base
-from apps.shared.encryption import encrypt_token, decrypt_token
+from apps.shared.encryption import decrypt_token, encrypt_token
 
 
 class WakaTimeAuth(Base):

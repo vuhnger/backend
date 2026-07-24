@@ -3,8 +3,10 @@ WakaTime API client wrapper
 """
 import logging
 from datetime import date
+
 import httpx
 from sqlalchemy.orm import Session
+
 from apps.wakatime.utils import get_valid_token
 
 logger = logging.getLogger(__name__)
