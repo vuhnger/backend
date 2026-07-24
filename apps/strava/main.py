@@ -7,7 +7,7 @@ Single user mode - stores one set of tokens and serves cached data.
 
 import logging
 from datetime import datetime
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
 from fastapi.responses import RedirectResponse, FileResponse
 from sqlalchemy.orm import Session
 from sqlalchemy import desc, extract, func
@@ -82,7 +82,12 @@ def authorize():
 
 
 @router.get("/callback")
-def oauth_callback(code: str, state: str, db: Session = Depends(get_db)):
+def oauth_callback(
+    code: str,
+    state: str,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
+):
     """
     OAuth callback endpoint.
     Strava redirects here after user authorizes.
@@ -146,11 +151,9 @@ def oauth_callback(code: str, state: str, db: Session = Depends(get_db)):
         )
         raise HTTPException(status_code=500, detail=sanitized_msg)
 
-    # Trigger initial data fetch (async would be better, but simple sync for now)
-    try:
-        fetch_and_cache_stats()
-    except Exception as e:
-        logger.warning(f"Initial data fetch failed: {e}", exc_info=True)
+    # Fetch initial data AFTER the response is sent, so the OAuth redirect
+    # returns immediately instead of blocking on a full Strava sync.
+    background_tasks.add_task(fetch_and_cache_stats)
 
     # Redirect to frontend success page
     frontend_url = settings.frontend_url or "https://vuhnger.dev"

@@ -4,7 +4,7 @@ WakaTime Service API
 
 import logging
 import httpx
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session
 
@@ -62,7 +62,12 @@ def authorize():
 
 
 @router.get("/callback")
-def oauth_callback(code: str, state: str, db: Session = Depends(get_db)):
+def oauth_callback(
+    code: str,
+    state: str,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
+):
     if not validate_state(state):
         raise HTTPException(status_code=400, detail="Invalid state")
 
@@ -133,11 +138,8 @@ def oauth_callback(code: str, state: str, db: Session = Depends(get_db)):
         sanitized_msg, _ = log_and_sanitize_error(e, "WakaTime Auth", "Auth failed")
         raise HTTPException(status_code=500, detail=sanitized_msg)
 
-    # Initial fetch
-    try:
-        fetch_and_cache_wakatime_stats()
-    except Exception as e:
-        logger.warning(f"Initial fetch failed: {e}")
+    # Fetch initial data after the response is sent, so the redirect is instant.
+    background_tasks.add_task(fetch_and_cache_wakatime_stats)
 
     frontend_url = settings.frontend_url or "https://vuhnger.dev"
     return RedirectResponse(url=f"{frontend_url}/?wakatime=success")
