@@ -8,7 +8,7 @@ Single user mode - stores one set of tokens and serves cached data.
 import os
 import logging
 from datetime import datetime
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import RedirectResponse, FileResponse
 from sqlalchemy.orm import Session
 from sqlalchemy import desc, extract, func
@@ -342,14 +342,16 @@ def get_yearly_stats(db: Session = Depends(get_db)):
 
 @router.get("/activities")
 def get_all_activities_endpoint(
-    limit: int = 100,
-    offset: int = 0,
+    limit: int = Query(100, ge=1, le=200, description="Max rows to return (capped at 200)."),
+    offset: int = Query(0, ge=0),
     year: int = None,
     activity_type: str = None,
     db: Session = Depends(get_db),
 ):
     """
     Get all activities from history with pagination and filtering.
+
+    `limit` is capped at 200 so a client can't request an unbounded result set.
     """
     query = db.query(StravaActivity).order_by(desc(StravaActivity.start_date))
 

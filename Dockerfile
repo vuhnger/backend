@@ -16,3 +16,9 @@ COPY pyproject.toml uv.lock ./
 RUN uv sync --frozen
 
 COPY . .
+
+# Drop root. uid 1000 lines up with the host 'rocky' user that owns the
+# bind-mounted upload dir, so the projects app can still write uploads.
+RUN useradd -u 1000 -m appuser \
+    && chown -R appuser:appuser /app /opt/venv
+USER appuser
