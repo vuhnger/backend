@@ -51,8 +51,6 @@ jobs:
           tags: |
             ${{ env.IMAGE }}:${{ github.event.workflow_run.head_sha }}
             ${{ env.IMAGE }}:latest
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
 
   # 2) Pull the freshly built image on the server and roll the services. No
   #    `down`, no `--build`: `up -d` recreates only changed containers.
