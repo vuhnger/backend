@@ -9,7 +9,7 @@ import logging
 import httpx
 from fastapi import APIRouter
 
-from apps.shared.app_factory import create_app
+from apps.shared.app_factory import create_app, include_versioned
 
 logger = logging.getLogger(__name__)
 
@@ -48,4 +48,4 @@ async def health():
         }
 
 
-app.include_router(router)
+include_versioned(app, router)

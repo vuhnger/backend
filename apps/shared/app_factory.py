@@ -9,7 +9,7 @@ Centralizing it here means a new service is a single ``create_app()`` call and
 the security hardening can never silently drift between apps.
 """
 
-from fastapi import FastAPI
+from fastapi import APIRouter, FastAPI
 from fastapi.openapi.docs import get_swagger_ui_oauth2_redirect_html
 from fastapi.staticfiles import StaticFiles
 
@@ -79,3 +79,16 @@ def create_app(
         return get_swagger_ui_oauth2_redirect_html()
 
     return app
+
+
+def include_versioned(app: FastAPI, router: APIRouter, *, latest: str = "/v1") -> None:
+    """Mount a router at the versioned path and keep the bare path as an alias.
+
+    Backward-compatible API versioning: the router is served at ``/<latest>/…``
+    (the documented, canonical path) and also at its bare path — the latter
+    hidden from the schema so it reads as a deprecated alias. Existing clients
+    (the frontend, Strava's configured OAuth redirect) keep working unchanged
+    while new consumers can move to ``/v1``.
+    """
+    app.include_router(router, prefix=latest)
+    app.include_router(router, include_in_schema=False)

@@ -14,7 +14,7 @@ from sqlalchemy import desc, extract, func
 from sqlalchemy.orm import Session
 from stravalib.client import Client
 
-from apps.shared.app_factory import create_app
+from apps.shared.app_factory import create_app, include_versioned
 from apps.shared.auth import get_api_key
 from apps.shared.config import settings
 from apps.shared.database import check_db_connection, get_db
@@ -395,4 +395,4 @@ def refresh_data(full: bool = False, api_key: str = Depends(get_api_key)):
         raise HTTPException(status_code=500, detail=sanitized_msg)
 
 
-app.include_router(router)
+include_versioned(app, router)

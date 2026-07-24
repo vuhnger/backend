@@ -9,7 +9,7 @@ from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session
 
-from apps.shared.app_factory import create_app
+from apps.shared.app_factory import create_app, include_versioned
 from apps.shared.auth import get_api_key
 from apps.shared.config import settings
 from apps.shared.database import check_db_connection, get_db
@@ -182,4 +182,4 @@ def get_all_time(db: Session = Depends(get_db)):
     return stats.to_dict()
 
 
-app.include_router(router)
+include_versioned(app, router)
