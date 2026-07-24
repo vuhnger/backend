@@ -9,7 +9,7 @@ dependencies = [
     "uvicorn[standard]==0.27.0",
     # Database
     "sqlalchemy==2.0.25",
-    "psycopg2-binary==2.9.9",
+    "psycopg2-binary==2.9.12",
     # External APIs
     "stravalib==1.6.0",
     # httpx is our sole HTTP client (sync + async). `requests` is no longer a
