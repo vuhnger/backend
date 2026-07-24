@@ -54,9 +54,21 @@ class Settings(BaseSettings):
     upload_dir: str = "/home/rocky/uploads/projects"
     upload_base_url: str = "https://api.vuhnger.dev/uploads/projects"
 
+    # Notifications — ntfy topic URL, e.g. https://ntfy.sh/<secret-topic>.
+    # (Add telegram_/discord_ fields here as more providers are wired.)
+    ntfy_url: str | None = None
+
+    # Visit notifications
+    visit_notify_throttle_seconds: int = 3600  # at most one ping per IP per hour
+    visit_notify_exclude_ips: str = ""         # comma-separated IPs to ignore (e.g. yours)
+
     @property
     def is_production(self) -> bool:
         return self.environment == "production"
+
+    @property
+    def excluded_visit_ips(self) -> set[str]:
+        return {ip.strip() for ip in self.visit_notify_exclude_ips.split(",") if ip.strip()}
 
 
 @lru_cache
