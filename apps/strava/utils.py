@@ -4,9 +4,12 @@ Utility functions for Strava token management
 import os
 import time
 from typing import Dict, Any
-import requests
+import httpx
 from sqlalchemy.orm import Session
 from apps.strava.models import StravaAuth
+
+# Every outbound call needs a timeout; a hung Strava endpoint must not pin a worker.
+HTTP_TIMEOUT = 10.0
 
 
 def is_token_expired(expires_at: int) -> bool:
@@ -41,14 +44,15 @@ def refresh_strava_token(db: Session) -> Dict[str, Any]:
 
     try:
         # Request new tokens from Strava
-        response = requests.post(
+        response = httpx.post(
             "https://www.strava.com/oauth/token",
             data={
                 "client_id": client_id,
                 "client_secret": client_secret,
                 "grant_type": "refresh_token",
                 "refresh_token": auth.refresh_token
-            }
+            },
+            timeout=HTTP_TIMEOUT,
         )
 
         if response.status_code != 200:

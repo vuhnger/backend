@@ -12,7 +12,8 @@ dependencies = [
     "psycopg2-binary==2.9.9",
     # External APIs
     "stravalib==1.6.0",
-    "requests==2.33.0",
+    # httpx is our sole HTTP client (sync + async). `requests` is no longer a
+    # direct dependency — it stays in the lock only as a stravalib transitive.
     "httpx==0.27.0",
     # Security
     "cryptography==48.0.1",

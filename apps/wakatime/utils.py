@@ -4,9 +4,12 @@ Utility functions for WakaTime token management
 import os
 import time
 from typing import Dict, Any
-import requests
+import httpx
 from sqlalchemy.orm import Session
 from apps.wakatime.models import WakaTimeAuth
+
+# Every outbound call needs a timeout; a hung WakaTime endpoint must not pin a worker.
+HTTP_TIMEOUT = 10.0
 
 
 def is_token_expired(expires_at: int) -> bool:
@@ -51,9 +54,10 @@ def refresh_wakatime_token(db: Session) -> Dict[str, Any]:
             "redirect_uri": redirect_uri
         }
         
-        response = requests.post(
+        response = httpx.post(
             "https://wakatime.com/oauth/token",
-            data=data
+            data=data,
+            timeout=HTTP_TIMEOUT,
         )
 
         if response.status_code != 200:
