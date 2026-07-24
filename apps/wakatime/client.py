@@ -2,7 +2,7 @@
 WakaTime API client wrapper
 """
 import logging
-from datetime import datetime, date
+from datetime import date
 import requests
 from sqlalchemy.orm import Session
 from apps.wakatime.utils import get_valid_token

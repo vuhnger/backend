@@ -3,7 +3,6 @@ Projects database models.
 
 Stores project information including metadata, images, and links.
 """
-from datetime import datetime
 from sqlalchemy import Column, Integer, String, Text, Boolean, DateTime, func
 from sqlalchemy.dialects.postgresql import JSONB
 

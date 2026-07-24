@@ -1,0 +1,72 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  # Cancel superseded runs on the same ref (saves CI minutes on rapid pushes).
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    name: Lint (ruff)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+      - name: Sync dependencies
+        run: uv sync --frozen
+      - name: Ruff (correctness rules)
+        run: uv run ruff check .
+
+  test:
+    name: Tests (pytest)
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: backend_user
+          POSTGRES_DB: backend_db
+          # Ephemeral, localhost-only CI database: accept local connections with
+          # no password. Means there is no credential anywhere to hardcode.
+          POSTGRES_HOST_AUTH_METHOD: trust
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U backend_user"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      ENVIRONMENT: development
+      # Passwordless DSN — the CI Postgres uses trust auth (see service above).
+      DATABASE_URL: postgresql+psycopg2://backend_user@localhost:5432/backend_db
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+      - name: Sync dependencies (incl. dev)
+        run: uv sync --frozen
+      - name: Generate throwaway test secrets
+        # The apps only need these set to boot; values are irrelevant to the
+        # tests. Generated at runtime so no secret-shaped literal is committed.
+        run: |
+          {
+            echo "ENCRYPTION_KEY=$(openssl rand -hex 16)"
+            echo "STATE_SECRET=$(openssl rand -hex 16)"
+            echo "INTERNAL_API_KEY=$(openssl rand -hex 16)"
+          } >> "$GITHUB_ENV"
+      - name: Run tests
+        run: uv run pytest -q

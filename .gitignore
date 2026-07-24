@@ -133,5 +133,11 @@ test_*.py
 *_test.py
 benchmark_*.py
 
+# ...but always track the real test suite's Python sources (CI runs it).
+# Scoped to *.py so __pycache__/*.pyc stays ignored via *.py[cod] above.
+!tests/
+!tests/*.py
+!tests/**/*.py
+
 refresh.sh
 n8n-workflows/*

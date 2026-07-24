@@ -2,7 +2,6 @@
 Background tasks for fetching and caching WakaTime data
 """
 import logging
-from sqlalchemy.orm import Session
 from apps.shared.database import SessionLocal
 from apps.wakatime.models import WakaTimeStats, WakaTimeAuth
 from apps.wakatime.client import get_stats, get_today_summary, get_weekly_summary

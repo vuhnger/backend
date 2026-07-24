@@ -22,14 +22,33 @@ dependencies = [
 ]
 
 [dependency-groups]
-# Test tooling. pytest-asyncio must track pytest's major line — 0.23.x caps at
-# pytest<9, which is what broke the old requirements.txt. >=1.0 supports pytest 9.
+# Test + lint tooling. pytest-asyncio must track pytest's major line — 0.23.x
+# caps at pytest<9, which is what broke the old requirements.txt. >=1.0 supports
+# pytest 9.
 dev = [
     "pytest==9.0.3",
     "pytest-asyncio>=1.0",
+    "ruff>=0.6",
 ]
 
 [tool.uv]
 # The apps are run as modules (uvicorn apps.x.main:app) from the source tree,
 # not installed as a distribution — so only resolve/install dependencies.
 package = false
+
+[tool.pytest.ini_options]
+# Run from the repo root so `import apps.…` resolves without installing the pkg.
+pythonpath = ["."]
+testpaths = ["tests"]
+# Let pytest-asyncio pick up `async def test_*` without per-test markers.
+asyncio_mode = "auto"
+
+[tool.ruff]
+line-length = 120
+target-version = "py311"
+
+[tool.ruff.lint]
+# Start enforceable and correctness-focused: pyflakes (undefined names, unused
+# imports — real breakage) + syntax errors. Style/upgrade rules can be added
+# later without blocking CI on pre-existing formatting choices.
+select = ["F", "E9"]
