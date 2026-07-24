@@ -10,11 +10,12 @@ the app factory does this.
 import logging
 
 import structlog
+from structlog.typing import Processor
 
 from apps.shared.config import settings
 
 # Shared processors applied to both structlog- and stdlib-originated records.
-_SHARED_PROCESSORS = [
+_SHARED_PROCESSORS: list[Processor] = [
     structlog.contextvars.merge_contextvars,
     structlog.stdlib.add_log_level,
     structlog.stdlib.add_logger_name,

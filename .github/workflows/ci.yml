@@ -27,6 +27,8 @@ jobs:
         run: uv sync --frozen
       - name: Ruff (correctness rules)
         run: uv run ruff check .
+      - name: Mypy (type check — scoped to apps/shared)
+        run: uv run mypy
 
   test:
     name: Tests (pytest)
