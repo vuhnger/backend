@@ -1,0 +1,82 @@
+# Local development stack.
+#
+# Differs from docker-compose.yml (prod) by:
+#   - reading secrets from a local .env (env_file)
+#   - bind-mounting the source and running uvicorn --reload (edit -> reload)
+#   - exposing Postgres on the host for inspection
+#   - writing uploads to a local ./uploads dir instead of a server path
+#
+# Usage:  docker compose -f docker-compose.dev.yml up   (or: make dev-up)
+
+x-app-base: &app-base
+  build: .
+  env_file: .env
+  environment:
+    DATABASE_URL: postgresql+psycopg2://${POSTGRES_USER:-backend_user}:${POSTGRES_PASSWORD:-changeme}@db:5432/${POSTGRES_DB:-backend_db}
+    ENVIRONMENT: development
+  volumes:
+    - .:/app
+  depends_on:
+    db:
+      condition: service_healthy
+  networks:
+    - backend
+
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-backend_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-changeme}
+      POSTGRES_DB: ${POSTGRES_DB:-backend_db}
+    # Host 5433 -> container 5432 (5432 is often taken by a local Postgres).
+    # Apps connect to db:5432 over the internal network regardless of this mapping.
+    ports:
+      - "127.0.0.1:5433:5432"
+    volumes:
+      - postgres_data_dev:/var/lib/postgresql/data
+    networks:
+      - backend
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-backend_user}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  strava-api:
+    <<: *app-base
+    command: ["uvicorn", "apps.strava.main:app", "--host", "0.0.0.0", "--port", "5001", "--reload"]
+    ports:
+      - "127.0.0.1:5001:5001"
+
+  wakatime-api:
+    <<: *app-base
+    command: ["uvicorn", "apps.wakatime.main:app", "--host", "0.0.0.0", "--port", "5002", "--reload"]
+    ports:
+      - "127.0.0.1:5002:5002"
+
+  n8n-api:
+    <<: *app-base
+    command: ["uvicorn", "apps.n8n.main:app", "--host", "0.0.0.0", "--port", "5004", "--reload"]
+    ports:
+      - "127.0.0.1:5004:5004"
+
+  projects-api:
+    <<: *app-base
+    command: ["uvicorn", "apps.projects.main:app", "--host", "0.0.0.0", "--port", "5005", "--reload"]
+    environment:
+      DATABASE_URL: postgresql+psycopg2://${POSTGRES_USER:-backend_user}:${POSTGRES_PASSWORD:-changeme}@db:5432/${POSTGRES_DB:-backend_db}
+      ENVIRONMENT: development
+      UPLOAD_DIR: /app/uploads/projects
+      UPLOAD_BASE_URL: http://localhost:5005/uploads/projects
+    volumes:
+      - .:/app
+      - ./uploads:/app/uploads
+    ports:
+      - "127.0.0.1:5005:5005"
+
+networks:
+  backend:
+
+volumes:
+  postgres_data_dev:

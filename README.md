@@ -909,28 +909,33 @@ docker stats
 
 ## Development
 
-### Local Setup (without Docker)
+### Local Setup (Docker, recommended)
+
+The full stack (Postgres + all apps with hot-reload) runs from `docker-compose.dev.yml`:
 
 ```bash
-# Install dependencies
-python3 -m venv venv
-source venv/bin/activate
-pip install -r requirements.txt
+cp .env.example .env      # then fill in secrets (or seed from the server)
+make dev-up               # build + start db and all apps
+make dev-logs             # tail logs
+make headers              # curl security headers from each app
+make dev-down             # stop (keeps the db volume)
+```
 
-# Setup local PostgreSQL
-createdb backend_db
-psql backend_db < schema.sql
+Apps: Strava `:5001`, WakaTime `:5002`, n8n `:5004`, projects `:5005`. Postgres is exposed on `:5432`.
 
-# Run locally
-uvicorn apps.strava.main:app --reload --port 5001
+### Local Setup (without Docker)
+
+Dependencies are managed with [uv](https://docs.astral.sh/uv/) and pinned in `uv.lock`:
+
+```bash
+uv sync                   # create .venv from the lockfile
+uv run uvicorn apps.strava.main:app --reload --port 5001
 ```
 
 ### Run Tests
 
 ```bash
-pytest
-flake8 apps/ --max-line-length=120
-mypy apps/ --ignore-missing-imports
+uv run pytest
 ```
 
 ## License

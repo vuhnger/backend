@@ -1,0 +1,24 @@
+# Never copy secrets or local state into image layers
+.env
+.env.*
+.venv
+venv
+
+# VCS / caches
+.git
+.gitignore
+.ruff_cache
+.pytest_cache
+__pycache__
+*.pyc
+
+# Local dev / editor
+.DS_Store
+.claude
+.clauderules
+uploads
+n8n-workflows
+plans
+
+# Docs / examples not needed at runtime
+frontend-examples
