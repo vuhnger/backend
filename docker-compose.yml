@@ -124,6 +124,20 @@ services:
     networks:
       - backend
 
+  # Restarts any container Docker marks 'unhealthy' — the liveness-probe behaviour
+  # that `restart: unless-stopped` doesn't cover (a hung-but-not-exited process).
+  # Watches the per-service healthchecks defined above. Single-host alternative to
+  # a k8s liveness probe. It needs the Docker socket (read-write) to issue restarts.
+  autoheal:
+    image: willfarrell/autoheal:1.2.0
+    restart: unless-stopped
+    environment:
+      AUTOHEAL_CONTAINER_LABEL: all   # watch every container that has a healthcheck
+      AUTOHEAL_INTERVAL: "15"         # poll health every 15s
+      AUTOHEAL_START_PERIOD: "30"     # give a restarted container time before re-checking
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+
 networks:
   backend:
 
