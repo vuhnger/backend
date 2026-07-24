@@ -4,7 +4,7 @@ WakaTime Service API
 
 import os
 import logging
-import requests
+import httpx
 from fastapi import FastAPI, APIRouter, Depends, HTTPException
 from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
@@ -110,7 +110,7 @@ def oauth_callback(code: str, state: str, db: Session = Depends(get_db)):
     }
 
     try:
-        response = requests.post(token_url, data=data)
+        response = httpx.post(token_url, data=data, timeout=10.0)
         response.raise_for_status()
 
         try:
@@ -135,9 +135,10 @@ def oauth_callback(code: str, state: str, db: Session = Depends(get_db)):
         expires_at_timestamp = int(time.time()) + expires_at
 
         # Get user info for ID
-        user_resp = requests.get(
+        user_resp = httpx.get(
             "https://wakatime.com/api/v1/users/current",
             headers={"Authorization": f"Bearer {access_token}"},
+            timeout=10.0,
         )
         user_resp.raise_for_status()
         user_data = user_resp.json()["data"]
