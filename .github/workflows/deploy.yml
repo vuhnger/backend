@@ -70,7 +70,11 @@ jobs:
           script: |
             set -euo pipefail
             cd backend
-            git pull origin main
+            # Mirror origin exactly — a deploy target must never carry its own git
+            # state. `git pull` fails on any local commit/change on the server
+            # (e.g. a stray rebase), which would stall every deploy; reset can't.
+            git fetch origin main
+            git reset --hard origin/main
             echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
             docker compose pull
             # Apply DB migrations before starting the new code (see alembic/README
