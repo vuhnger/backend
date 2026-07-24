@@ -20,7 +20,7 @@ from apps.projects.schemas import (
     ProjectResponse,
     ProjectUpdate,
 )
-from apps.shared.app_factory import create_app
+from apps.shared.app_factory import create_app, include_versioned
 from apps.shared.auth import get_api_key
 from apps.shared.config import settings
 from apps.shared.database import check_db_connection, get_db
@@ -264,4 +264,4 @@ async def upload_image(
     )
 
 
-app.include_router(router)
+include_versioned(app, router)
