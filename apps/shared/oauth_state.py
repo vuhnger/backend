@@ -7,12 +7,13 @@ to prevent CSRF attacks in OAuth 2.0 flows.
 import base64
 import hashlib
 import hmac
-import os
 import secrets
 import time
 
+from apps.shared.config import settings
+
 # State secret for HMAC signing (must be set in production)
-STATE_SECRET = os.getenv("STATE_SECRET")
+STATE_SECRET = settings.state_secret
 
 # State expiry time in seconds (10 minutes)
 STATE_EXPIRY = 600

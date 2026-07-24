@@ -5,27 +5,18 @@ This module provides the basic SQLAlchemy setup for database connectivity.
 NO models are defined here - this is just infrastructure.
 """
 
-import os
-
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import declarative_base, sessionmaker
 
-# Get database URL from environment variable
-DATABASE_URL = os.getenv("DATABASE_URL")
+from apps.shared.config import settings
+
+DATABASE_URL = settings.database_url
 
 if not DATABASE_URL:
     raise RuntimeError(
         "DATABASE_URL environment variable must be set. "
         "Example: postgresql+psycopg2://user:password@host:5432/database"
     )
-
-
-def _int_env(name: str, default: int) -> int:
-    """Read a positive-int tuning knob from the environment, falling back safely."""
-    try:
-        return int(os.getenv(name, default))
-    except (TypeError, ValueError):
-        return default
 
 
 # Create engine with SQLAlchemy's default QueuePool instead of NullPool.
@@ -39,10 +30,10 @@ def _int_env(name: str, default: int) -> int:
 # All knobs are env-overridable so a low-memory host can shrink the pool.
 engine = create_engine(
     DATABASE_URL,
-    pool_size=_int_env("DB_POOL_SIZE", 5),
-    max_overflow=_int_env("DB_MAX_OVERFLOW", 10),
-    pool_timeout=_int_env("DB_POOL_TIMEOUT", 30),
-    pool_recycle=_int_env("DB_POOL_RECYCLE", 1800),
+    pool_size=settings.db_pool_size,
+    max_overflow=settings.db_max_overflow,
+    pool_timeout=settings.db_pool_timeout,
+    pool_recycle=settings.db_pool_recycle,
     pool_pre_ping=True,
     echo=False,  # Set to True for SQL query logging during development
 )

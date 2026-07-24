@@ -1,13 +1,13 @@
 """
 Utility functions for Strava token management
 """
-import os
 import time
 from typing import Any
 
 import httpx
 from sqlalchemy.orm import Session
 
+from apps.shared.config import settings
 from apps.strava.models import StravaAuth
 
 # Every outbound call needs a timeout; a hung Strava endpoint must not pin a worker.
@@ -38,8 +38,8 @@ def refresh_strava_token(db: Session) -> dict[str, Any]:
         raise ValueError("No Strava authentication found. Please complete OAuth flow first.")
 
     # Prepare token refresh request
-    client_id = os.getenv("STRAVA_CLIENT_ID")
-    client_secret = os.getenv("STRAVA_CLIENT_SECRET")
+    client_id = settings.strava_client_id
+    client_secret = settings.strava_client_secret
 
     if not client_id or not client_secret:
         raise ValueError("Strava credentials not configured")

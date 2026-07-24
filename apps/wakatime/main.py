@@ -3,15 +3,15 @@ WakaTime Service API
 """
 
 import logging
-import os
 
 import httpx
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session
 
 from apps.shared.app_factory import create_app
 from apps.shared.auth import get_api_key
+from apps.shared.config import settings
 from apps.shared.database import check_db_connection, get_db
 from apps.shared.encryption import encrypt_token
 from apps.shared.errors import log_and_sanitize_error
@@ -42,8 +42,8 @@ def health():
 
 @router.get("/authorize")
 def authorize():
-    client_id = os.getenv("WAKATIME_CLIENT_ID")
-    redirect_uri = os.getenv("WAKATIME_REDIRECT_URI")
+    client_id = settings.wakatime_client_id
+    redirect_uri = settings.wakatime_redirect_uri
 
     if not client_id or not redirect_uri:
         raise HTTPException(status_code=500, detail="WakaTime OAuth not configured")
@@ -63,13 +63,18 @@ def authorize():
 
 
 @router.get("/callback")
-def oauth_callback(code: str, state: str, db: Session = Depends(get_db)):
+def oauth_callback(
+    code: str,
+    state: str,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
+):
     if not validate_state(state):
         raise HTTPException(status_code=400, detail="Invalid state")
 
-    client_id = os.getenv("WAKATIME_CLIENT_ID")
-    client_secret = os.getenv("WAKATIME_CLIENT_SECRET")
-    redirect_uri = os.getenv("WAKATIME_REDIRECT_URI")
+    client_id = settings.wakatime_client_id
+    client_secret = settings.wakatime_client_secret
+    redirect_uri = settings.wakatime_redirect_uri
 
     token_url = "https://wakatime.com/oauth/token"
     data = {
@@ -134,13 +139,10 @@ def oauth_callback(code: str, state: str, db: Session = Depends(get_db)):
         sanitized_msg, _ = log_and_sanitize_error(e, "WakaTime Auth", "Auth failed")
         raise HTTPException(status_code=500, detail=sanitized_msg)
 
-    # Initial fetch
-    try:
-        fetch_and_cache_wakatime_stats()
-    except Exception as e:
-        logger.warning(f"Initial fetch failed: {e}")
+    # Fetch initial data after the response is sent, so the redirect is instant.
+    background_tasks.add_task(fetch_and_cache_wakatime_stats)
 
-    frontend_url = os.getenv("FRONTEND_URL", "https://vuhnger.dev")
+    frontend_url = settings.frontend_url or "https://vuhnger.dev"
     return RedirectResponse(url=f"{frontend_url}/?wakatime=success")
 
 

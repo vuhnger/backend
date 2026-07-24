@@ -15,6 +15,8 @@ from fastapi.staticfiles import StaticFiles
 
 from apps.shared.cache_control_headers import setup_cache_control
 from apps.shared.cors import setup_cors
+from apps.shared.logging_config import configure_logging
+from apps.shared.rate_limit import setup_rate_limiting
 from apps.shared.security_headers import setup_security_headers
 from apps.shared.swagger_ui import render_swagger_ui_html
 
@@ -38,6 +40,7 @@ def create_app(
     Returns:
         A configured ``FastAPI`` instance. Callers add their own routers.
     """
+    configure_logging()
     prefix = url_prefix.strip("/")
 
     app = FastAPI(
@@ -55,6 +58,7 @@ def create_app(
     setup_cors(app)
     setup_cache_control(app)
     setup_security_headers(app)
+    setup_rate_limiting(app)
 
     # Serve Swagger UI assets locally (no third-party CDN) so the strict CSP applies.
     app.mount("/static", StaticFiles(directory="static"), name="static")

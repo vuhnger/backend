@@ -6,10 +6,9 @@ Single user mode - stores one set of tokens and serves cached data.
 """
 
 import logging
-import os
 from datetime import datetime
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
 from fastapi.responses import FileResponse, RedirectResponse
 from sqlalchemy import desc, extract, func
 from sqlalchemy.orm import Session
@@ -17,6 +16,7 @@ from stravalib.client import Client
 
 from apps.shared.app_factory import create_app
 from apps.shared.auth import get_api_key
+from apps.shared.config import settings
 from apps.shared.database import check_db_connection, get_db
 from apps.shared.errors import log_and_sanitize_error
 from apps.shared.oauth_state import generate_state, validate_state
@@ -60,8 +60,8 @@ def authorize():
     Initiate OAuth flow by redirecting to Strava.
     User will be redirected to Strava to authorize the app.
     """
-    client_id = os.getenv("STRAVA_CLIENT_ID")
-    redirect_uri = os.getenv("STRAVA_REDIRECT_URI")
+    client_id = settings.strava_client_id
+    redirect_uri = settings.strava_redirect_uri
 
     if not client_id or not redirect_uri:
         raise HTTPException(status_code=500, detail="Strava OAuth not configured")
@@ -83,7 +83,12 @@ def authorize():
 
 
 @router.get("/callback")
-def oauth_callback(code: str, state: str, db: Session = Depends(get_db)):
+def oauth_callback(
+    code: str,
+    state: str,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
+):
     """
     OAuth callback endpoint.
     Strava redirects here after user authorizes.
@@ -95,8 +100,8 @@ def oauth_callback(code: str, state: str, db: Session = Depends(get_db)):
             status_code=400, detail="Invalid or expired state parameter"
         )
 
-    client_id = os.getenv("STRAVA_CLIENT_ID")
-    client_secret = os.getenv("STRAVA_CLIENT_SECRET")
+    client_id = settings.strava_client_id
+    client_secret = settings.strava_client_secret
 
     if not client_id or not client_secret:
         raise HTTPException(status_code=500, detail="Strava OAuth not configured")
@@ -147,14 +152,12 @@ def oauth_callback(code: str, state: str, db: Session = Depends(get_db)):
         )
         raise HTTPException(status_code=500, detail=sanitized_msg)
 
-    # Trigger initial data fetch (async would be better, but simple sync for now)
-    try:
-        fetch_and_cache_stats()
-    except Exception as e:
-        logger.warning(f"Initial data fetch failed: {e}", exc_info=True)
+    # Fetch initial data AFTER the response is sent, so the OAuth redirect
+    # returns immediately instead of blocking on a full Strava sync.
+    background_tasks.add_task(fetch_and_cache_stats)
 
     # Redirect to frontend success page
-    frontend_url = os.getenv("FRONTEND_URL", "https://vuhnger.dev")
+    frontend_url = settings.frontend_url or "https://vuhnger.dev"
     return RedirectResponse(url=f"{frontend_url}/?strava=success")
 
 
@@ -343,14 +346,16 @@ def get_yearly_stats(db: Session = Depends(get_db)):
 
 @router.get("/activities")
 def get_all_activities_endpoint(
-    limit: int = 100,
-    offset: int = 0,
+    limit: int = Query(100, ge=1, le=200, description="Max rows to return (capped at 200)."),
+    offset: int = Query(0, ge=0),
     year: int = None,
     activity_type: str = None,
     db: Session = Depends(get_db),
 ):
     """
     Get all activities from history with pagination and filtering.
+
+    `limit` is capped at 200 so a client can't request an unbounded result set.
     """
     query = db.query(StravaActivity).order_by(desc(StravaActivity.start_date))
 

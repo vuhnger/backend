@@ -5,7 +5,6 @@ Covers the audit fixes: security headers (#3), the /admin route-ordering fix
 DB-free — the projects app imports without a live database.
 """
 
-import importlib
 import os
 
 from starlette.testclient import TestClient
@@ -36,16 +35,16 @@ def test_admin_route_not_shadowed_by_slug():  # #2
     assert "Project not found" not in r.text
 
 
-def test_cors_gates_dev_origins_by_environment():  # #4
+def test_cors_gates_dev_origins_by_environment(monkeypatch):  # #4
     import apps.shared.cors as cors
+    from apps.shared.config import settings
 
-    os.environ["ENVIRONMENT"] = "production"
-    importlib.reload(cors)
-    prod = cors.get_allowed_origins()
-    assert not any("localhost" in o for o in prod)
+    # get_allowed_origins() reads settings.is_production at call time, so patch
+    # the singleton (env+reload wouldn't reach the cached Settings).
+    monkeypatch.setattr(settings, "environment", "production")
+    assert not any("localhost" in o for o in cors.get_allowed_origins())
 
-    os.environ["ENVIRONMENT"] = "development"
-    importlib.reload(cors)
+    monkeypatch.setattr(settings, "environment", "development")
     assert any("localhost" in o for o in cors.get_allowed_origins())
 
 

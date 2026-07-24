@@ -1,13 +1,13 @@
 """
 Utility functions for WakaTime token management
 """
-import os
 import time
 from typing import Any
 
 import httpx
 from sqlalchemy.orm import Session
 
+from apps.shared.config import settings
 from apps.wakatime.models import WakaTimeAuth
 
 # Every outbound call needs a timeout; a hung WakaTime endpoint must not pin a worker.
@@ -38,9 +38,9 @@ def refresh_wakatime_token(db: Session) -> dict[str, Any]:
         raise ValueError("No WakaTime authentication found. Please complete OAuth flow first.")
 
     # Prepare token refresh request
-    client_id = os.getenv("WAKATIME_CLIENT_ID")
-    client_secret = os.getenv("WAKATIME_CLIENT_SECRET")
-    redirect_uri = os.getenv("WAKATIME_REDIRECT_URI")
+    client_id = settings.wakatime_client_id
+    client_secret = settings.wakatime_client_secret
+    redirect_uri = settings.wakatime_redirect_uri
 
     if not client_id or not client_secret:
         raise ValueError("WakaTime credentials not configured")

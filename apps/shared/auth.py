@@ -7,11 +7,12 @@ Checks for X-API-Key header and validates against environment variable.
 
 import hmac
 import logging
-import os
 
 from fastapi import HTTPException, Request, Security, status
 from fastapi.security import APIKeyHeader
 from starlette.middleware.base import BaseHTTPMiddleware
+
+from apps.shared.config import settings
 
 # Setup logging
 logger = logging.getLogger(__name__)
@@ -20,8 +21,8 @@ logger = logging.getLogger(__name__)
 API_KEY_HEADER = "X-API-Key"
 
 # Get API key and environment from environment variables
-INTERNAL_API_KEY = os.getenv("INTERNAL_API_KEY")
-ENVIRONMENT = os.getenv("ENVIRONMENT", "development")
+INTERNAL_API_KEY = settings.internal_api_key
+ENVIRONMENT = settings.environment
 
 # FastAPI dependency for API key
 api_key_header = APIKeyHeader(name=API_KEY_HEADER, auto_error=False)
