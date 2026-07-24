@@ -3,7 +3,7 @@ WakaTime API client wrapper
 """
 import logging
 from datetime import date
-import requests
+import httpx
 from sqlalchemy.orm import Session
 from apps.wakatime.utils import get_valid_token
 
@@ -22,10 +22,10 @@ def get_stats(db: Session, time_range: str = "last_7_days"):
     headers = {"Authorization": f"Bearer {access_token}"}
     
     try:
-        response = requests.get(url, headers=headers, timeout=10)
+        response = httpx.get(url, headers=headers, timeout=10)
         response.raise_for_status()
         return response.json().get("data", {})
-    except requests.RequestException as e:
+    except httpx.HTTPError as e:
         logger.error(f"Failed to fetch WakaTime stats ({time_range}): {e}")
         raise
 
@@ -44,11 +44,11 @@ def get_today_summary(db: Session):
     }
     
     try:
-        response = requests.get(url, headers=headers, params=params, timeout=10)
+        response = httpx.get(url, headers=headers, params=params, timeout=10)
         response.raise_for_status()
         data = response.json().get("data", [])
         return data[0] if data else {}
-    except requests.RequestException as e:
+    except httpx.HTTPError as e:
         logger.error(f"Failed to fetch WakaTime today summary: {e}")
         raise
 
@@ -71,7 +71,7 @@ def get_weekly_summary(db: Session):
     }
     
     try:
-        response = requests.get(url, headers=headers, params=params, timeout=10)
+        response = httpx.get(url, headers=headers, params=params, timeout=10)
         response.raise_for_status()
         data = response.json()
         
@@ -88,7 +88,7 @@ def get_weekly_summary(db: Session):
             "daily_summaries": summaries,
             "range": "last_7_days"
         }
-    except requests.RequestException as e:
+    except httpx.HTTPError as e:
         logger.error(f"Failed to fetch WakaTime weekly summary: {e}")
         raise
 
