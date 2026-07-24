@@ -11,7 +11,7 @@ from datetime import datetime
 from fastapi import FastAPI, APIRouter, Depends, HTTPException
 from fastapi.responses import RedirectResponse, FileResponse
 from sqlalchemy.orm import Session
-from sqlalchemy import desc, extract
+from sqlalchemy import desc, extract, func
 from stravalib.client import Client
 
 from apps.shared.database import get_db, Base, engine, check_db_connection
@@ -303,15 +303,13 @@ def get_all_time_totals(db: Session = Depends(get_db)):
     """
     Get all-time totals for each activity type.
     """
-    from sqlalchemy import sum
-
     results = (
         db.query(
             StravaActivity.type,
             func.count(StravaActivity.id).label("count"),
-            sum(StravaActivity.distance).label("distance"),
-            sum(StravaActivity.moving_time).label("moving_time"),
-            sum(StravaActivity.total_elevation_gain).label("elevation_gain"),
+            func.sum(StravaActivity.distance).label("distance"),
+            func.sum(StravaActivity.moving_time).label("moving_time"),
+            func.sum(StravaActivity.total_elevation_gain).label("elevation_gain"),
         )
         .group_by(StravaActivity.type)
         .all()
@@ -337,8 +335,6 @@ def get_yearly_stats(db: Session = Depends(get_db)):
     """
     Get activity totals grouped by year and type.
     """
-    from sqlalchemy import sum
-
     year_col = extract("year", StravaActivity.start_date_local)
 
     results = (
@@ -346,9 +342,9 @@ def get_yearly_stats(db: Session = Depends(get_db)):
             year_col.label("year"),
             StravaActivity.type,
             func.count(StravaActivity.id).label("count"),
-            sum(StravaActivity.distance).label("distance"),
-            sum(StravaActivity.moving_time).label("moving_time"),
-            sum(StravaActivity.total_elevation_gain).label("elevation_gain"),
+            func.sum(StravaActivity.distance).label("distance"),
+            func.sum(StravaActivity.moving_time).label("moving_time"),
+            func.sum(StravaActivity.total_elevation_gain).label("elevation_gain"),
         )
         .group_by(year_col, StravaActivity.type)
         .order_by(desc("year"), StravaActivity.type)
