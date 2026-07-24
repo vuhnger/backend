@@ -24,6 +24,7 @@ dependencies = [
     "aiofiles==25.1.0",
     "python-multipart==0.0.31",
     "alembic>=1.18.5",
+    "filetype>=1.2.0",
 ]
 
 [dependency-groups]
