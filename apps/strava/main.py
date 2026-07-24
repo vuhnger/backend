@@ -18,6 +18,8 @@ from apps.shared.database import get_db, Base, engine, check_db_connection
 from apps.shared.auth import get_api_key
 from apps.shared.cors import setup_cors
 from apps.shared.cache_control_headers import setup_cache_control
+from apps.shared.security_headers import setup_security_headers
+from apps.shared.swagger_ui import render_swagger_ui_html
 from apps.shared.oauth_state import generate_state, validate_state
 from apps.shared.errors import log_and_sanitize_error
 from apps.strava.models import StravaAuth, StravaStats, StravaActivity
@@ -25,7 +27,8 @@ from apps.strava.tasks import fetch_and_cache_stats
 
 logger = logging.getLogger(__name__)
 
-from fastapi.openapi.docs import get_swagger_ui_html
+from fastapi.staticfiles import StaticFiles
+from fastapi.openapi.docs import get_swagger_ui_oauth2_redirect_html
 
 # Create database tables
 Base.metadata.create_all(bind=engine)
@@ -34,13 +37,17 @@ app = FastAPI(
     title="Strava Service",
     version="1.0.0",
     description="Strava OAuth integration with cached activity statistics",
-    docs_url="/strava/docs",
+    docs_url=None,
     openapi_url="/strava/openapi.json",
 )
 
 # Setup CORS from shared configuration
 setup_cors(app)
 setup_cache_control(app)
+setup_security_headers(app)
+
+# Serve Swagger UI assets locally (no third-party CDN) so a strict CSP applies.
+app.mount("/static", StaticFiles(directory="static"), name="static")
 
 # Router setup
 router = APIRouter(prefix="/strava")
@@ -49,6 +56,20 @@ router = APIRouter(prefix="/strava")
 @app.get("/", response_class=FileResponse)
 def landing_page():
     return FileResponse("static/index.html")
+
+
+@app.get("/strava/docs", include_in_schema=False)
+def swagger_ui_html():
+    return render_swagger_ui_html(
+        openapi_url=app.openapi_url,
+        title=app.title,
+        oauth2_redirect_url="/strava/docs/oauth2-redirect",
+    )
+
+
+@app.get("/strava/docs/oauth2-redirect", include_in_schema=False)
+def swagger_ui_redirect():
+    return get_swagger_ui_oauth2_redirect_html()
 
 
 @router.get("/health")

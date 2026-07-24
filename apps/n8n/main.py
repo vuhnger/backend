@@ -7,9 +7,13 @@ Provides a health check endpoint that verifies n8n.vuhnger.dev is operational.
 import logging
 import httpx
 from fastapi import FastAPI, APIRouter
+from fastapi.staticfiles import StaticFiles
+from fastapi.openapi.docs import get_swagger_ui_oauth2_redirect_html
 
 from apps.shared.cors import setup_cors
 from apps.shared.cache_control_headers import setup_cache_control
+from apps.shared.security_headers import setup_security_headers
+from apps.shared.swagger_ui import render_swagger_ui_html
 
 logger = logging.getLogger(__name__)
 
@@ -17,15 +21,33 @@ app = FastAPI(
     title="n8n Health Check Service",
     version="1.0.0",
     description="Health check proxy for n8n automation platform",
-    docs_url="/n8n/docs",
+    docs_url=None,
     openapi_url="/n8n/openapi.json",
 )
 
 # Setup CORS from shared configuration
 setup_cors(app)
 setup_cache_control(app)
+setup_security_headers(app)
+
+# Serve Swagger UI assets locally (no third-party CDN) so a strict CSP applies.
+app.mount("/static", StaticFiles(directory="static"), name="static")
 
 router = APIRouter(prefix="/n8n", tags=["n8n"])
+
+
+@app.get("/n8n/docs", include_in_schema=False)
+def swagger_ui_html():
+    return render_swagger_ui_html(
+        openapi_url=app.openapi_url,
+        title=app.title,
+        oauth2_redirect_url="/n8n/docs/oauth2-redirect",
+    )
+
+
+@app.get("/n8n/docs/oauth2-redirect", include_in_schema=False)
+def swagger_ui_redirect():
+    return get_swagger_ui_oauth2_redirect_html()
 
 
 @router.get("/health")
