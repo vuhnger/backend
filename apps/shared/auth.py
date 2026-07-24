@@ -5,12 +5,13 @@ Simple API key-based authentication for internal services.
 Checks for X-API-Key header and validates against environment variable.
 """
 
-import os
 import hmac
 import logging
 from fastapi import Request, HTTPException, status, Security
 from fastapi.security import APIKeyHeader
 from starlette.middleware.base import BaseHTTPMiddleware
+
+from apps.shared.config import settings
 
 # Setup logging
 logger = logging.getLogger(__name__)
@@ -19,8 +20,8 @@ logger = logging.getLogger(__name__)
 API_KEY_HEADER = "X-API-Key"
 
 # Get API key and environment from environment variables
-INTERNAL_API_KEY = os.getenv("INTERNAL_API_KEY")
-ENVIRONMENT = os.getenv("ENVIRONMENT", "development")
+INTERNAL_API_KEY = settings.internal_api_key
+ENVIRONMENT = settings.environment
 
 # FastAPI dependency for API key
 api_key_header = APIKeyHeader(name=API_KEY_HEADER, auto_error=False)

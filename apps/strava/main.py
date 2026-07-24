@@ -5,7 +5,6 @@ OAuth integration for Strava with cached statistics.
 Single user mode - stores one set of tokens and serves cached data.
 """
 
-import os
 import logging
 from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -14,6 +13,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import desc, extract, func
 from stravalib.client import Client
 
+from apps.shared.config import settings
 from apps.shared.database import get_db, check_db_connection
 from apps.shared.auth import get_api_key
 from apps.shared.app_factory import create_app
@@ -59,8 +59,8 @@ def authorize():
     Initiate OAuth flow by redirecting to Strava.
     User will be redirected to Strava to authorize the app.
     """
-    client_id = os.getenv("STRAVA_CLIENT_ID")
-    redirect_uri = os.getenv("STRAVA_REDIRECT_URI")
+    client_id = settings.strava_client_id
+    redirect_uri = settings.strava_redirect_uri
 
     if not client_id or not redirect_uri:
         raise HTTPException(status_code=500, detail="Strava OAuth not configured")
@@ -94,8 +94,8 @@ def oauth_callback(code: str, state: str, db: Session = Depends(get_db)):
             status_code=400, detail="Invalid or expired state parameter"
         )
 
-    client_id = os.getenv("STRAVA_CLIENT_ID")
-    client_secret = os.getenv("STRAVA_CLIENT_SECRET")
+    client_id = settings.strava_client_id
+    client_secret = settings.strava_client_secret
 
     if not client_id or not client_secret:
         raise HTTPException(status_code=500, detail="Strava OAuth not configured")
@@ -153,7 +153,7 @@ def oauth_callback(code: str, state: str, db: Session = Depends(get_db)):
         logger.warning(f"Initial data fetch failed: {e}", exc_info=True)
 
     # Redirect to frontend success page
-    frontend_url = os.getenv("FRONTEND_URL", "https://vuhnger.dev")
+    frontend_url = settings.frontend_url or "https://vuhnger.dev"
     return RedirectResponse(url=f"{frontend_url}/?strava=success")
 
 

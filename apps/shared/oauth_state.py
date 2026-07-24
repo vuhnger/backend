@@ -4,16 +4,17 @@ OAuth State Management
 Provides secure per-request OAuth state generation and validation
 to prevent CSRF attacks in OAuth 2.0 flows.
 """
-import os
 import time
 import hmac
 import hashlib
 import secrets
 import base64
 
+from apps.shared.config import settings
+
 
 # State secret for HMAC signing (must be set in production)
-STATE_SECRET = os.getenv("STATE_SECRET")
+STATE_SECRET = settings.state_secret
 
 # State expiry time in seconds (10 minutes)
 STATE_EXPIRY = 600

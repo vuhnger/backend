@@ -1,8 +1,9 @@
 """Sentralisert CORS-konfigurasjon for alle backend-tjenester."""
 
-import os
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+
+from apps.shared.config import settings
 
 
 # Produksjons-origins (alltid tillatt)
@@ -30,7 +31,7 @@ def get_allowed_origins() -> list[str]:
     origins = list(PRODUCTION_ORIGINS)
 
     # Legg til FRONTEND_URL fra env hvis satt
-    frontend_url = os.getenv("FRONTEND_URL")
+    frontend_url = settings.frontend_url
     if frontend_url:
         clean_url = frontend_url.rstrip("/")
         if clean_url not in origins:
@@ -38,7 +39,7 @@ def get_allowed_origins() -> list[str]:
 
     # Localhost-origins kun utenfor produksjon. I prod har de ingenting å gjøre
     # (med allow_credentials=True er en localhost-origin en unødvendig åpning).
-    if os.getenv("ENVIRONMENT", "development") != "production":
+    if not settings.is_production:
         origins.extend(DEV_ORIGINS)
 
     # Legg til ekstra origins

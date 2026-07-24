@@ -12,6 +12,7 @@ from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 
+from apps.shared.config import settings
 from apps.shared.database import get_db, check_db_connection
 from apps.shared.auth import get_api_key
 from apps.shared.app_factory import create_app
@@ -29,8 +30,8 @@ logger = logging.getLogger(__name__)
 # at import time. See alembic/ and `make migrate`.
 
 # Upload configuration
-UPLOAD_DIR = os.getenv("UPLOAD_DIR", "/home/rocky/uploads/projects")
-UPLOAD_BASE_URL = os.getenv("UPLOAD_BASE_URL", "https://api.vuhnger.dev/uploads/projects")
+UPLOAD_DIR = settings.upload_dir
+UPLOAD_BASE_URL = settings.upload_base_url
 ALLOWED_TYPES = {"image/jpeg", "image/png", "image/webp", "image/gif"}
 MAX_FILE_SIZE = 10 * 1024 * 1024  # 10 MB
 

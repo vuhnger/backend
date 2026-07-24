@@ -10,13 +10,13 @@ low-traffic deployment; point `RATE_LIMIT_STORAGE_URI` at Redis if it ever runs
 multi-worker and the limit needs to be shared.
 """
 
-import os
-
 from fastapi import FastAPI, Request
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
 from slowapi.util import get_remote_address
+
+from apps.shared.config import settings
 
 
 def _client_ip(request: Request) -> str:
@@ -33,11 +33,10 @@ def _client_ip(request: Request) -> str:
 
 def setup_rate_limiting(app: FastAPI) -> Limiter:
     """Attach a per-IP rate limiter with a sensible default to every route."""
-    default_limit = os.getenv("RATE_LIMIT_DEFAULT", "120/minute")
     limiter = Limiter(
         key_func=_client_ip,
-        default_limits=[default_limit],
-        storage_uri=os.getenv("RATE_LIMIT_STORAGE_URI"),  # None -> in-memory
+        default_limits=[settings.rate_limit_default],
+        storage_uri=settings.rate_limit_storage_uri,  # None -> in-memory
         headers_enabled=True,  # emit X-RateLimit-* response headers
     )
     app.state.limiter = limiter

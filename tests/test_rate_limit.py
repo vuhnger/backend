@@ -1,44 +1,33 @@
 """Rate limiting is wired into every app via the shared factory."""
 
-import importlib
-import os
-
+from fastapi import FastAPI
 from starlette.testclient import TestClient
 
+from apps.shared.config import settings
+from apps.shared.rate_limit import setup_rate_limiting
 
-def test_default_limit_returns_429_when_exceeded():
-    os.environ["RATE_LIMIT_DEFAULT"] = "3/minute"
-    import apps.shared.rate_limit as rl
 
-    importlib.reload(rl)
-    from fastapi import FastAPI
-
+def _app_with_ping() -> FastAPI:
     app = FastAPI()
-    rl.setup_rate_limiting(app)
+    setup_rate_limiting(app)
 
     @app.get("/ping")
     def ping():
         return {"ok": True}
 
-    client = TestClient(app)
+    return app
+
+
+def test_default_limit_returns_429_when_exceeded(monkeypatch):
+    # setup_rate_limiting reads settings.rate_limit_default at call time; patch
+    # the singleton (the cached Settings won't pick up an env change).
+    monkeypatch.setattr(settings, "rate_limit_default", "3/minute")
+    client = TestClient(_app_with_ping())
     codes = [client.get("/ping").status_code for _ in range(5)]
-    assert 429 in codes, codes
     assert codes[:3] == [200, 200, 200]
-    os.environ.pop("RATE_LIMIT_DEFAULT", None)
+    assert 429 in codes, codes
 
 
 def test_ratelimit_headers_emitted():
-    import apps.shared.rate_limit as rl
-
-    importlib.reload(rl)
-    from fastapi import FastAPI
-
-    app = FastAPI()
-    rl.setup_rate_limiting(app)
-
-    @app.get("/ping")
-    def ping():
-        return {"ok": True}
-
-    headers = {k.lower() for k in TestClient(app).get("/ping").headers}
+    headers = {k.lower() for k in TestClient(_app_with_ping()).get("/ping").headers}
     assert "x-ratelimit-limit" in headers
