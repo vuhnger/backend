@@ -17,6 +17,7 @@ from apps.shared.cors import setup_cors
 from apps.shared.cache_control_headers import setup_cache_control
 from apps.shared.security_headers import setup_security_headers
 from apps.shared.rate_limit import setup_rate_limiting
+from apps.shared.logging_config import configure_logging
 from apps.shared.swagger_ui import render_swagger_ui_html
 
 
@@ -39,6 +40,7 @@ def create_app(
     Returns:
         A configured ``FastAPI`` instance. Callers add their own routers.
     """
+    configure_logging()
     prefix = url_prefix.strip("/")
 
     app = FastAPI(

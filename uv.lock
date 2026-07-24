@@ -87,6 +87,7 @@ dependencies = [
     { name = "slowapi" },
     { name = "sqlalchemy" },
     { name = "stravalib" },
+    { name = "structlog" },
     { name = "uvicorn", extra = ["standard"] },
 ]
 
@@ -112,6 +113,7 @@ requires-dist = [
     { name = "slowapi", specifier = ">=0.1.10" },
     { name = "sqlalchemy", specifier = ">=2.0.35,<2.1" },
     { name = "stravalib", specifier = ">=2.5,<3.0" },
+    { name = "structlog", specifier = ">=26.1.0" },
     { name = "uvicorn", extras = ["standard"], specifier = "==0.51.0" },
 ]
 
@@ -764,6 +766,15 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/e8/61/a3c43433e06dd2edfb249a99e7740802d2c64b2f8d5126a64118263cb75c/stravalib-2.5.0.tar.gz", hash = "sha256:d97a845a30c861bc65a854423b201497f0ea56ba5a763294b8d886269bbe6fe3", size = 4129391, upload-time = "2026-06-01T13:24:26.124Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/f4/0a/9c510377cca40b6bebe915d451126db413391664db88ff50fe02a7be7709/stravalib-2.5.0-py3-none-any.whl", hash = "sha256:723422a3f06fd7f213b9b4b813f730a481fd0869b5b5e6a350f4823a1063d092", size = 128193, upload-time = "2026-06-01T13:24:24.697Z" },
+]
+
+[[package]]
+name = "structlog"
+version = "26.1.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/5e/89/b4a0bcfdf4f71a3dea31379f095929613d7e4528a0996bca6aa964cd0dca/structlog-26.1.0.tar.gz", hash = "sha256:f63a716cbd1b1291cf7661de7794b455acfa4c43c5bcf1630e6ad5ddc1adb3b7", size = 1459881, upload-time = "2026-06-06T07:33:39.348Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/a9/18/489c97b834dfff9cf2fc2507cede4bcd4b11e67f84bc462acd1992496f86/structlog-26.1.0-py3-none-any.whl", hash = "sha256:e081a26d6c373e6d201eca24eede26d8ffab07f88f477822e679183428d3d91e", size = 73764, upload-time = "2026-06-06T07:33:38.046Z" },
 ]
 
 [[package]]
