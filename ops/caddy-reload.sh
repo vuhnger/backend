@@ -22,13 +22,23 @@ set -euo pipefail
 CADDYFILE="${CADDYFILE:-/etc/caddy/Caddyfile}"
 ADMIN="${CADDY_ADMIN:-http://localhost:2019}"
 
+# File scope, not local to main: the EXIT trap fires after main has returned, so
+# a local would be out of scope by then and `set -u` would abort the trap -- which
+# made the script exit non-zero after a completely successful reload.
+ADAPTED=""
+
+cleanup() {
+    [[ -n "$ADAPTED" ]] && rm -f "$ADAPTED"
+    return 0
+}
+trap cleanup EXIT
+
 main() {
     require_cmd caddy curl python3
     [[ -f "$CADDYFILE" ]] || die "no such file: $CADDYFILE"
 
-    local adapted
-    adapted="$(mktemp)"
-    trap 'rm -f "$adapted"' EXIT
+    ADAPTED="$(mktemp)"
+    local adapted="$ADAPTED"
 
     log "validating $CADDYFILE"
     if ! caddy validate --adapter caddyfile --config "$CADDYFILE" >/dev/null 2>&1; then
