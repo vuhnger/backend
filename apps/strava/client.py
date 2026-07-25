@@ -6,8 +6,8 @@ from datetime import datetime, timedelta
 from typing import Any
 
 from sqlalchemy.orm import Session
-from stravalib.client import Client
 
+from apps.strava.client_factory import strava_client
 from apps.strava.utils import get_valid_token
 
 
@@ -17,7 +17,7 @@ def get_ytd_stats(db: Session) -> dict[str, dict[str, Any]]:
     Returns: dict with counts, distances, times, elevation
     """
     access_token = get_valid_token(db)
-    client = Client(access_token=access_token)
+    client = strava_client(access_token)
 
     # Get athlete stats
     athlete = client.get_athlete()
@@ -49,7 +49,7 @@ def get_recent_activities(db: Session, limit: int = 30) -> list[dict[str, Any]]:
     Returns: list of activity dictionaries
     """
     access_token = get_valid_token(db)
-    client = Client(access_token=access_token)
+    client = strava_client(access_token)
 
     # Get recent activities
     activities = client.get_activities(limit=limit)
@@ -75,7 +75,7 @@ def get_monthly_stats(db: Session, months: int = 12) -> dict[str, dict[str, Any]
     Returns: dict with monthly summaries
     """
     access_token = get_valid_token(db)
-    client = Client(access_token=access_token)
+    client = strava_client(access_token)
 
     # Calculate date range
     end_date = datetime.now()
@@ -123,7 +123,7 @@ def get_all_activities(db: Session, limit: int = None, after=None):
     fetched — used for incremental syncs so we don't re-download all history.
     """
     access_token = get_valid_token(db)
-    client = Client(access_token=access_token)
+    client = strava_client(access_token)
 
     # Paginated automatically by stravalib; `after` narrows to recent activities.
     activities = client.get_activities(limit=limit, after=after)

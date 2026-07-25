@@ -45,15 +45,19 @@ class Settings(BaseSettings):
     # everything else needs far less.
     max_request_body_bytes: int = 11 * 1024 * 1024
 
-    # Strava OAuth
+    # Strava OAuth. The owner id is optional: the first account to authorize
+    # becomes the owner, and every later callback must match it. Set it explicitly
+    # only to re-establish ownership after the auth row has been wiped.
     strava_client_id: str | None = None
     strava_client_secret: str | None = None
     strava_redirect_uri: str | None = None
+    strava_owner_athlete_id: str | None = None
 
-    # WakaTime OAuth
+    # WakaTime OAuth (same ownership rule as Strava above).
     wakatime_client_id: str | None = None
     wakatime_client_secret: str | None = None
     wakatime_redirect_uri: str | None = None
+    wakatime_owner_user_id: str | None = None
 
     # n8n upstream the health proxy checks. Was hardcoded in apps/n8n/main.py.
     n8n_url: str | None = "https://n8n.vuhnger.dev"

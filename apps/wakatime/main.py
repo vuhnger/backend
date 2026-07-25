@@ -15,7 +15,9 @@ from apps.shared.config import settings
 from apps.shared.database import check_db_connection, get_db
 from apps.shared.encryption import encrypt_token
 from apps.shared.errors import log_and_sanitize_error
+from apps.shared.oauth_owner import enforce_owner
 from apps.shared.oauth_state import generate_state, validate_state
+from apps.shared.oauth_tokens import parse_expiry, parse_token_response
 from apps.shared.upsert import atomic_upsert_auth
 from apps.wakatime.models import WakaTimeAuth, WakaTimeStats
 from apps.wakatime.tasks import fetch_and_cache_wakatime_stats
@@ -89,26 +91,12 @@ def oauth_callback(
         response = httpx.post(token_url, data=data, timeout=10.0)
         response.raise_for_status()
 
-        try:
-            token_data = response.json()
-        except ValueError:
-            # WakaTime sometimes returns application/x-www-form-urlencoded body
-            from urllib.parse import parse_qs
-
-            parsed = parse_qs(response.text)
-            # parse_qs returns lists, we need single values
-            token_data = {k: v[0] for k, v in parsed.items()}
-
+        # WakaTime answers form-encoded rather than JSON; both decodings and the
+        # expiry handling are shared with the refresh path so the two can't drift.
+        token_data = parse_token_response(response)
         access_token = token_data["access_token"]
         refresh_token = token_data["refresh_token"]
-        expires_at = int(
-            float(token_data.get("expires_in", 3600))
-        )  # Not absolute time yet?
-
-        # Actually standard OAuth 'expires_in' is seconds from now.
-        import time
-
-        expires_at_timestamp = int(time.time()) + expires_at
+        expires_at_timestamp = parse_expiry(token_data)
 
         # Get user info for ID
         user_resp = httpx.get(
@@ -119,6 +107,17 @@ def oauth_callback(
         user_resp.raise_for_status()
         user_data = user_resp.json()["data"]
         user_id = user_data["id"]
+
+        # This endpoint is public, so the account behind the exchange has to be
+        # checked before it can replace the stored grant.
+        enforce_owner(
+            db=db,
+            model=WakaTimeAuth,
+            id_field="user_id",
+            incoming_id=user_id,
+            configured_owner=settings.wakatime_owner_user_id,
+            provider="wakatime",
+        )
 
         # Store in DB
         atomic_upsert_auth(
@@ -134,6 +133,11 @@ def oauth_callback(
         )
         db.commit()
 
+    except HTTPException:
+        # A deliberate rejection (e.g. wrong account) must reach the caller as
+        # itself, not be reshaped into a 500 by the handler below.
+        db.rollback()
+        raise
     except Exception as e:
         db.rollback()
         sanitized_msg, _ = log_and_sanitize_error(e, "WakaTime Auth", "Auth failed")
