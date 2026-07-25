@@ -13,6 +13,7 @@ from fastapi import APIRouter, FastAPI
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.openapi.docs import get_swagger_ui_oauth2_redirect_html
 from fastapi.staticfiles import StaticFiles
+from starlette.types import Lifespan
 
 from apps.shared.body_limit import BodySizeLimitMiddleware
 from apps.shared.cache_control_headers import setup_cache_control
@@ -30,6 +31,7 @@ def create_app(
     url_prefix: str,
     description: str = "",
     version: str = "1.0.0",
+    lifespan: Lifespan | None = None,
 ) -> FastAPI:
     """Build a hardened FastAPI app with locally-served docs under ``/<url_prefix>/docs``.
 
@@ -39,6 +41,11 @@ def create_app(
             drives ``openapi.json`` and the docs routes.
         description: Optional OpenAPI description.
         version: OpenAPI version string.
+        lifespan: Optional async context manager for startup/shutdown work.
+            Every app so far is stateless and needs none; the site service holds
+            open WebSockets and has to close them deliberately on SIGTERM, or
+            clients see a dropped connection instead of a close frame and answer
+            it with a reconnect storm.
 
     Returns:
         A configured ``FastAPI`` instance. Callers add their own routers.
@@ -50,6 +57,7 @@ def create_app(
         title=title,
         version=version,
         description=description,
+        lifespan=lifespan,
         # Built-in docs are disabled so Swagger UI is served from local /static
         # assets under a strict CSP instead of a third-party CDN.
         docs_url=None,

@@ -1,32 +1,60 @@
-"""Site service — a lightweight beacon the frontend pings on page load.
+"""Site service — everything the public frontend talks to directly.
 
-When a *new* visitor arrives it pushes a notification via the pluggable notifier
-(ntfy today, more later). Historical analytics live in Umami; this is only the
-real-time "someone's here" ping. No DB — throttling is in-memory, which is fine
-for this single-worker deployment.
+Two features, both about who is on the site right now:
+
+* ``POST /site/visit`` — a beacon the frontend pings on page load. A *new*
+  visitor pushes a notification through the pluggable notifier (ntfy today).
+  Historical analytics live in Umami; this is only the "someone's here" ping.
+* ``WS /site/ws/cursors`` — live cursor presence, so visitors on the same page
+  see each other's pointers. See ``apps.site.cursors``.
+
+Neither touches the DB: throttling and presence are in-memory, which is correct
+for this single-worker deployment and nowhere else.
 """
 
 import ipaddress
 import logging
 import time
 from collections import OrderedDict
+from contextlib import asynccontextmanager
 from urllib.parse import parse_qs, urlsplit
 
 import httpx
-from fastapi import APIRouter, BackgroundTasks, Request
+from fastapi import APIRouter, BackgroundTasks, FastAPI, Request
 from pydantic import BaseModel, Field
 
 from apps.shared.app_factory import create_app, include_versioned
 from apps.shared.config import settings
 from apps.shared.net import client_ip
 from apps.shared.notifications import notifier
+from apps.site import cursors
 
 logger = logging.getLogger(__name__)
+
+
+@asynccontextmanager
+async def lifespan(_: FastAPI):
+    """Stop the per-room broadcast loops on shutdown.
+
+    Not the sockets: uvicorn closes those itself, and does it *before* it runs
+    lifespan shutdown (``Server.shutdown`` calls ``connection.shutdown()`` on
+    every connection, then waits, then fires this). What it does not know about
+    are the ``asyncio`` tasks this app started on its own — one per active room.
+    Left running they keep ticking against peers that are already gone, and the
+    loop is torn down mid-await at interpreter exit instead of cancelled cleanly.
+
+    This also matters under ``--reload`` in development, where the process is not
+    exiting at all: without it every reload leaks another set of room loops.
+    """
+    yield
+    await cursors.hub.shutdown()
+
 
 app = create_app(
     title="Site Service",
     url_prefix="site",
-    description="Visitor beacon that pushes a notification on a new visit",
+    description="Visitor beacon and live cursor presence for the public site",
+    lifespan=lifespan,
 )
 router = APIRouter(prefix="/site")
 
@@ -188,3 +216,6 @@ def visit(payload: VisitIn, request: Request, background_tasks: BackgroundTasks)
 
 
 include_versioned(app, router)
+# Mounted the same way, so the cursor endpoint answers on both /site/ws/cursors
+# and /v1/site/ws/cursors and matches every other route's versioning contract.
+include_versioned(app, cursors.router)
