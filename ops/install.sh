@@ -18,13 +18,27 @@ BACKUP_DIR="${BACKUP_DIR:-/mnt/docker-data/backups/postgres}"
 BEGIN_MARK="# >>> backend ops (managed by ops/install.sh) >>>"
 END_MARK="# <<< backend ops <<<"
 
-main() {
-    [[ "${1:-}" == "--uninstall" ]] && { uninstall; exit 0; }
+# The one cron line the old setup used, matched in full so that a hand-written
+# variant of it is never silently thrown away. Override if yours differs.
+LEGACY_CRON="${LEGACY_CRON:-15 9 * * * $HOME/scripts/backend_healthcheck.sh >> $HOME/logs/backend_healthcheck.log 2>&1}"
 
+die() { echo "install.sh: $*" >&2; exit 1; }
+
+main() {
+    # A typo like --uninstal must not silently fall through to a full install,
+    # which would rewrite the managed cron block.
+    case "${1:-}" in
+        "")          ;;
+        --uninstall) uninstall; exit 0 ;;
+        *)           die "unknown argument: $1 (usage: $0 [--uninstall])" ;;
+    esac
+
+    # Before anything is written, not after: a syntax error found post-install
+    # leaves broken scripts on disk and broken jobs in cron.
+    verify
     install_scripts
     install_dirs
     install_cron
-    verify
 
     cat <<EOF
 
@@ -53,22 +67,48 @@ install_dirs() {
     mkdir -p "$LOG_DIR"
 
     # The backup directory lives on the large second disk, not the root volume.
+    # Only the directory itself changes hands: a recursive chown of its parent
+    # would take ownership of every unrelated backup set stored alongside it.
     if [[ ! -d "$BACKUP_DIR" ]]; then
         sudo mkdir -p "$BACKUP_DIR"
-        sudo chown -R "$(id -u):$(id -g)" "$(dirname "$BACKUP_DIR")"
+        sudo chown "$(id -u):$(id -g)" "$BACKUP_DIR"
+        sudo chmod 0700 "$BACKUP_DIR"
     fi
     echo "backup dir: $BACKUP_DIR"
 }
 
+# `crontab -l 2>/dev/null || true` turns *any* read failure into an empty crontab,
+# and the crontab written from it would then wipe every hand-written job on the
+# box. Only "this user has no crontab yet" may be treated as empty.
+read_crontab() {
+    local out rc=0
+    out="$(crontab -l 2>&1)" || rc=$?
+
+    if (( rc == 0 )); then
+        printf '%s\n' "$out"
+        return 0
+    fi
+    [[ "$out" == *"no crontab for"* ]] && return 0
+
+    die "cannot read the current crontab (exit $rc): $out"
+}
+
 install_cron() {
     local current new
-    current="$(crontab -l 2>/dev/null || true)"
+    current="$(read_crontab)"
 
-    # Drop any previous managed block, and retire the old daily container-only
-    # healthcheck -- server-watchdog.sh covers it and much more, hourly.
+    # Drop any previous managed block.
     new="$(printf '%s\n' "$current" \
-        | sed "/$(escape "$BEGIN_MARK")/,/$(escape "$END_MARK")/d" \
-        | grep -v 'backend_healthcheck.sh' || true)"
+        | sed "/$(escape "$BEGIN_MARK")/,/$(escape "$END_MARK")/d")"
+
+    # Retire the old daily container-only healthcheck -- server-watchdog.sh covers
+    # it and much more, hourly. Matched as a whole line against the exact legacy
+    # entry: a substring match on the script name would also delete a hand-written
+    # invocation of it, which this script promises never to touch.
+    if printf '%s\n' "$new" | grep -qxF -- "$LEGACY_CRON"; then
+        new="$(printf '%s\n' "$new" | grep -vxF -- "$LEGACY_CRON" || true)"
+        echo "retired the legacy healthcheck entry (superseded by server-watchdog.sh)"
+    fi
 
     new+="
 $BEGIN_MARK
@@ -86,7 +126,7 @@ $END_MARK"
 
 uninstall() {
     local current
-    current="$(crontab -l 2>/dev/null || true)"
+    current="$(read_crontab)"
     printf '%s\n' "$current" \
         | sed "/$(escape "$BEGIN_MARK")/,/$(escape "$END_MARK")/d" \
         | crontab -
@@ -95,10 +135,12 @@ uninstall() {
 
 verify() {
     local script ok=1
-    for script in pg-backup.sh pg-restore-test.sh server-watchdog.sh caddy-reload.sh; do
-        bash -n "$DEST_DIR/$script" || { echo "SYNTAX ERROR in $script" >&2; ok=0; }
+    # common.sh included: every other script sources it, so a syntax error there
+    # breaks all four at once. Checked in $SRC_DIR because this runs before install.
+    for script in common.sh pg-backup.sh pg-restore-test.sh server-watchdog.sh caddy-reload.sh; do
+        bash -n "$SRC_DIR/$script" || { echo "SYNTAX ERROR in $script" >&2; ok=0; }
     done
-    (( ok )) || exit 1
+    (( ok )) || die "refusing to install scripts that do not parse"
     echo "syntax check passed"
 }
 
