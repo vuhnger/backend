@@ -51,6 +51,14 @@ services:
       STRAVA_CLIENT_SECRET: ${STRAVA_CLIENT_SECRET}
       STRAVA_REDIRECT_URI: ${STRAVA_REDIRECT_URI}
 
+      # Heatmap privacy clipping. Without the coordinate /strava/heatmap refuses
+      # to serve (503) rather than publish untrimmed tracks, so these have to be
+      # listed here explicitly -- this service has no env_file, which means the
+      # host .env only reaches the container through the names spelled out below.
+      STRAVA_HOME_LAT: ${STRAVA_HOME_LAT}
+      STRAVA_HOME_LNG: ${STRAVA_HOME_LNG}
+      STRAVA_PRIVACY_RADIUS_M: ${STRAVA_PRIVACY_RADIUS_M:-500}
+
       # Frontend integration
       FRONTEND_URL: ${FRONTEND_URL:-https://vuhnger.dev}
     depends_on:

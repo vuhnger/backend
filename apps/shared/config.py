@@ -8,8 +8,9 @@ config lives in one typed place.
 """
 
 from functools import lru_cache
+from typing import Any
 
-from pydantic import field_validator
+from pydantic import field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -18,6 +19,23 @@ class Settings(BaseSettings):
     # env is populated (docker compose `env_file: .env` / `environment:`), so
     # Settings doesn't parse .env itself — which also keeps tests hermetic.
     model_config = SettingsConfigDict(extra="ignore")
+
+    @model_validator(mode="before")
+    @classmethod
+    def _blank_means_unset(cls, data: Any) -> Any:
+        """Treat an empty environment variable as absent.
+
+        Compose expands an unset ``${VAR}`` to the empty string rather than
+        omitting it, so a value merely missing from the host .env arrives here
+        as ``""``. For the str fields that is harmless, but for a numeric one
+        pydantic raises at import time — and because this module builds its
+        singleton at import, that turns a forgotten .env line into a
+        crash-looping container instead of the intended graceful degradation.
+        Dropping blanks lets every field fall back to its declared default.
+        """
+        if isinstance(data, dict):
+            return {k: v for k, v in data.items() if not (isinstance(v, str) and v == "")}
+        return data
 
     # Runtime
     environment: str = "development"
