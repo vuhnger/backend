@@ -45,7 +45,12 @@ die() { echo "skill-scan: $*" >&2; exit 2; }
 WORKDIR=""
 cleanup() {
     local rc=$?
-    [[ -n "$WORKDIR" ]] && rm -rf "$WORKDIR"
+    # `|| true`, not a redirect: silencing rm's stderr would leave its non-zero
+    # status intact, and `set -e` would end the trap right there -- reporting a
+    # filesystem error in place of the gate result it was called with.
+    if [[ -n "$WORKDIR" ]]; then
+        rm -rf "$WORKDIR" || true
+    fi
     exit "$rc"
 }
 trap cleanup EXIT
@@ -106,6 +111,10 @@ main() {
     esac
 
     if [[ -n "$root" ]]; then
+        # --accept is only matched as the first argument, so `--repo --accept`
+        # would otherwise scan quietly and never write the baseline the user
+        # asked for. Reject the leftovers rather than doing the other thing.
+        (( $# == 1 )) || die "unexpected extra argument(s) after $1: ${*:2}"
         # Checked here, not inside find_skills: that runs in a process
         # substitution, so a die() in there would kill only the subshell and the
         # parent would read an empty list and call a mistyped root a clean pass.
@@ -132,25 +141,41 @@ main() {
 # One baseline per skill, named after its path so the mapping is obvious when
 # you later wonder why a finding stopped being reported.
 baseline_path() {
-    local slug
+    local slug sum
     # Leading dots are stripped: most skills live under ~/.claude, and keeping
     # that dot would make every baseline a hidden file -- invisible to `ls`, and
     # easy to lose track of for something whose whole job is suppressing alerts.
     slug="$(printf '%s' "${1#"$HOME"/}" | sed 's|[^A-Za-z0-9._-]|_|g; s|^[._]*||')"
-    printf '%s/%s.yaml' "$BASELINE_DIR" "$slug"
+    # The readable slug alone is not unique: collapsing every separator to _
+    # maps both foo/bar and foo_bar onto foo_bar, and one shared baseline file
+    # is exactly the cross-skill suppression the per-skill split exists to
+    # prevent. The checksum of the full path is what actually disambiguates.
+    sum="$(printf '%s' "$1" | cksum | cut -d' ' -f1)"
+    printf '%s/%s-%s.yaml' "$BASELINE_DIR" "$slug" "$sum"
 }
 
 accept_all() {
-    local target out
+    local target out err
     mkdir -p "$BASELINE_DIR" || die "cannot create baseline directory: $BASELINE_DIR"
+
+    # The baseline has to be generated the same way the scan reads it. Hardcoding
+    # --no-llm here would leave every LLM-found finding out of the baseline, so a
+    # team scanning with SKILL_SCAN_LLM=1 would keep being shown findings it had
+    # already reviewed and accepted -- forever, with no way to silence them.
+    local -a llm_arg=(--no-llm)
+    [[ "${SKILL_SCAN_LLM:-0}" == "1" ]] && llm_arg=()
 
     for target in "$@"; do
         out="$(baseline_path "$target")"
-        skillspector baseline "$target" --no-llm --output "$out" >/dev/null 2>&1 || true
+        # stderr is captured rather than discarded: it is the only explanation of
+        # why a baseline failed to write, and "could not write a baseline" on its
+        # own is not something anyone can act on.
+        err="$(skillspector baseline "$target" ${llm_arg[@]+"${llm_arg[@]}"} \
+            --output "$out" 2>&1 >/dev/null)" || true
         # No baseline file means the accept did not happen. Saying "accepted"
         # anyway would leave you believing findings are triaged when a later
         # scan will still report every one of them.
-        [[ -s "$out" ]] || die "could not write a baseline for $target"
+        [[ -s "$out" ]] || die "could not write a baseline for $target${err:+ -- $err}"
         echo "accepted: $(display_name "$target")  ->  $(tildify "$out")"
     done
     echo
