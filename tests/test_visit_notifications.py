@@ -114,3 +114,40 @@ def test_source_is_always_reported(referrer, path, expected):
 def test_notification_body_always_carries_a_source(notifier_mock):
     _post("9.9.9.5", referrer="", path="/")  # browser sent no referrer at all
     assert "↩︎ direct / unknown" in notifier_mock.send.call_args.args[0]
+
+
+# --- abuse resistance ------------------------------------------------------
+
+def test_oversized_fields_are_rejected_before_reaching_the_notifier(notifier_mock):
+    # Unbounded input here meant one request could fabricate a multi-megabyte push.
+    resp = TestClient(site.app).post(
+        "/site/visit",
+        json={"path": "/" + "a" * 5000, "referrer": "b" * 5000},
+        headers={"x-forwarded-for": "9.9.9.4", "user-agent": "Mozilla/5.0"},
+    )
+    assert resp.status_code == 422
+    assert notifier_mock.send.call_count == 0
+
+
+def test_schemeless_referrer_is_truncated_in_the_message():
+    assert len(site._source("x" * 250, "/")) == site._MAX_SOURCE_LEN
+
+
+def test_throttle_map_stays_bounded_under_distinct_ips(monkeypatch):
+    # Every entry stays fresh under a burst of new IPs, so expiry alone can't
+    # bound the map — it has to evict the oldest too.
+    site._last_notified.clear()
+    monkeypatch.setattr(site, "_MAX_TRACKED_IPS", 50)
+    for i in range(500):
+        site._throttle_ok(f"198.51.100.{i}")
+    assert len(site._last_notified) <= 50
+
+
+def test_geo_skips_addresses_that_cannot_resolve(monkeypatch):
+    def explode(*a, **kw):  # any outbound call here is a bug
+        raise AssertionError("should not perform a lookup")
+
+    monkeypatch.setattr(site.httpx, "get", explode)
+    assert site._geo("10.0.0.5") == ""      # private
+    assert site._geo("127.0.0.1") == ""     # loopback
+    assert site._geo("not-an-ip") == ""     # malformed
