@@ -27,9 +27,16 @@ def test_prefers_forwarded_for_over_the_proxy_peer():
     assert client_ip(req) == "203.0.113.9"
 
 
-def test_takes_the_first_hop_of_a_chain():
-    req = _request({"x-forwarded-for": "203.0.113.9, 10.0.0.1, 172.17.0.1"})
+def test_takes_the_last_hop_because_earlier_ones_are_client_controlled():
+    # A caller forging "X-Forwarded-For: 1.2.3.4" only prepends to its own real
+    # address, so the entry caddy appended last is the trustworthy one. Reading
+    # the first hop would let anyone choose their own rate-limit bucket.
+    req = _request({"x-forwarded-for": "1.2.3.4, 203.0.113.9"})
     assert client_ip(req) == "203.0.113.9"
+
+
+def test_single_hop_is_used_as_is():
+    assert client_ip(_request({"x-forwarded-for": "203.0.113.9"})) == "203.0.113.9"
 
 
 def test_falls_back_to_the_peer_without_the_header():

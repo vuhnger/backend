@@ -4,12 +4,6 @@ Every service runs behind caddy, so ``request.client.host`` is the proxy, not th
 caller. Two modules used to carry their own copy of this logic (rate limiting and
 the visit beacon); it lives here now so the per-IP identity that rate limits and
 visitor geo both depend on can only ever be defined once.
-
-Trust model: caddy overwrites ``X-Forwarded-For`` with the real peer address
-rather than appending to a client-supplied value (its default when no
-``trusted_proxies`` is configured), so the first hop is authoritative and not
-spoofable from the internet. The container ports are additionally bound to
-127.0.0.1, so nothing but caddy can reach them.
 """
 
 from starlette.requests import Request
@@ -18,10 +12,21 @@ UNKNOWN_IP = "unknown"
 
 
 def client_ip(request: Request) -> str:
-    """The real caller's IP, honouring the reverse proxy's X-Forwarded-For."""
+    """The real caller's IP, honouring the reverse proxy's X-Forwarded-For.
+
+    Takes the *last* hop, not the first. With exactly one trusted proxy in front
+    (caddy), the last entry is always the address caddy itself observed, so this
+    is correct whether caddy replaces the header or appends to a client-supplied
+    one — and a client that forges ``X-Forwarded-For: 1.2.3.4`` only ever prepends
+    to its own real address. Reading the first hop instead would let any caller
+    pick its own rate-limit bucket and its own reported location.
+
+    Trusting the last hop assumes nothing but caddy can reach the app. That holds:
+    the container ports are published on 127.0.0.1 only.
+    """
     forwarded = request.headers.get("x-forwarded-for")
     if forwarded:
-        first_hop = forwarded.split(",")[0].strip()
-        if first_hop:
-            return first_hop
+        hops = [hop.strip() for hop in forwarded.split(",") if hop.strip()]
+        if hops:
+            return hops[-1]
     return request.client.host if request.client else UNKNOWN_IP
