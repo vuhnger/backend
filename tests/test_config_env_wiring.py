@@ -48,6 +48,17 @@ def test_heatmap_settings_are_passed_into_the_container(strava_service_env, var)
         f"block, so it can never reach the process"
     )
 
+    # Presence alone isn't enough: the entry has to actually substitute the
+    # host variable of the same name. A hardcoded literal or a typo in the
+    # ${...} spelling would satisfy the check above while still starving the
+    # container. Prefix rather than equality, since a `:-default` suffix is
+    # legitimate.
+    value = strava_service_env[var]
+    assert isinstance(value, str) and value.startswith(f"${{{var}"), (
+        f"{var} is listed but resolves to {value!r} instead of substituting "
+        f"the host variable of the same name"
+    )
+
 
 def _settings_with_env(monkeypatch, **env: str) -> Settings:
     """Build Settings from real process env.
@@ -56,7 +67,14 @@ def _settings_with_env(monkeypatch, **env: str) -> Settings:
     field names, so the SCREAMING_CASE spelling would be silently discarded as
     an extra and every assertion below would pass against defaults instead of
     against the value under test.
+
+    Every heatmap variable is cleared first. setenv only overrides what a test
+    names, so a developer with STRAVA_HOME_LNG exported in their shell would
+    otherwise turn the half-configured case into a fully configured one and the
+    test would pass while asserting the opposite of what it claims.
     """
+    for key in HEATMAP_ENV_VARS:
+        monkeypatch.delenv(key, raising=False)
     for key, value in env.items():
         monkeypatch.setenv(key, value)
     return Settings()
