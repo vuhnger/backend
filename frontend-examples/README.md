@@ -97,11 +97,15 @@ export async function getHealth(): Promise<HealthResponse> {
 
 ## ⚠️ Important Notes
 
-- These are **placeholder/boilerplate files only**
-- No business logic implemented yet
-- Only the health endpoint is functional
-- Future endpoints are commented out as examples
-- DO NOT implement calendar features until backend is ready
+These apply to the **calendar** files above, not to the whole directory:
+
+- `api/calendar.ts`, `api/types.ts` and `components/HealthCheck.tsx` are
+  **placeholder/boilerplate only** — of those, just the health endpoint works
+- Future calendar endpoints are commented out as examples
+- DO NOT implement calendar features until the backend is ready
+
+`hooks/useCursors.ts` is not boilerplate: it is a working client for the
+endpoint documented below.
 
 ---
 
@@ -175,10 +179,16 @@ and send on a timer. Above 60 messages/second the connection is closed.
 | --- | --- | --- |
 | `1008` | Policy: bad origin, bad room name, too many tabs from your IP, or a stream of malformed frames. | **No.** Nothing about retrying changes the answer. |
 | `1013` | Full: the server, the room, or the room count is at capacity. | Yes, with backoff. |
-| `1012` | Server restarting (deploy). Sent by uvicorn itself, which closes
-connections before the app's own shutdown hook runs — so `1001` appears only
-under `--reload` in development. | Yes, with backoff. |
-| `1000` | Normal close. | — |
+| `1012` | Server restarting (deploy). Uvicorn sends this itself — it closes connections before the app's own shutdown hook runs, so `1001` shows up only under `--reload` in development. | Yes, with backoff. |
+| `1000` | Normal close, including the idle timeout below. | Yes, with backoff. |
+| `1006` | Abnormal — the socket died without a close frame. | Yes, with backoff. |
+
+Everything except `1008` is worth retrying, which is what `useCursors.ts` does.
+A consequence worth knowing: a backgrounded tab is closed with `1000` after the
+idle timeout, reconnects, goes idle again, and repeats — one handshake every 15
+minutes per abandoned tab. That is cheap enough to accept, and the per-IP cap
+bounds it; reconnecting only on `visibilitychange` would avoid it entirely if it
+ever stops being cheap.
 
 Back off exponentially **with jitter**. The interesting failure is a restart,
 when every open tab reconnects at once; a fixed delay makes them all arrive

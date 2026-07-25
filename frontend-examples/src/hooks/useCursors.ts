@@ -101,12 +101,21 @@ export function useCursors(options: UseCursorsOptions = {}): UseCursorsResult {
       const socket = new WebSocket(url);
       socketRef.current = socket;
 
+      // Every callback below is gated on this. A socket's events keep arriving
+      // after it has been superseded — change `room` and the old socket's
+      // `onclose` fires *after* the new one has already opened, so an ungated
+      // setConnected(false) would report the live connection as dead, and a
+      // late `frame` would write the old room's peers over the new room's.
+      const current = () => !closed && socketRef.current === socket;
+
       socket.onopen = () => {
+        if (!current()) return;
         retry = 0;
         setConnected(true);
       };
 
       socket.onmessage = (event) => {
+        if (!current()) return;
         const message: ServerMessage = JSON.parse(event.data);
         switch (message.t) {
           case 'welcome':
@@ -137,8 +146,13 @@ export function useCursors(options: UseCursorsOptions = {}): UseCursorsResult {
       };
 
       socket.onclose = (event) => {
+        if (!current()) return;
         setConnected(false);
-        if (closed) return;
+        // Presence is not durable across a disconnect: the peers list describes
+        // who is in the room *right now*, and leaving it on screen paints
+        // cursors for people who may have gone. The next welcome rebuilds it.
+        setPeers([]);
+        setSelf(null);
         // 1008 is a policy refusal — a bad origin, a bad room, or too many tabs
         // from this address. Retrying cannot change any of those, and hammering
         // a rejection is how a cap turns into a self-inflicted outage.
@@ -193,6 +207,13 @@ export function useCursors(options: UseCursorsOptions = {}): UseCursorsResult {
       window.clearInterval(pingTimer);
       socketRef.current?.close(1000, 'unmounted');
       socketRef.current = null;
+      // Cleared here too, not just in onclose: on unmount or a room change the
+      // close is ours, and `closed` already gated onclose out. Without this the
+      // old room's cursors survive into the new one.
+      pending.current = null;
+      setPeers([]);
+      setSelf(null);
+      setConnected(false);
     };
   }, [room, sendHz, enabled]);
 

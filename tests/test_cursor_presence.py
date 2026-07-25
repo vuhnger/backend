@@ -20,6 +20,7 @@ from starlette.websockets import WebSocketDisconnect, WebSocketState
 import apps.shared.cors as cors
 import apps.site.cursors as cursors
 import apps.site.main as site
+from apps.shared.config import Settings
 from apps.site.cursors import PALETTE, CursorHub, JoinRejected, _coord, _TokenBucket, _valid_room
 
 
@@ -376,3 +377,30 @@ def test_a_missing_origin_is_allowed_outside_production_only(monkeypatch):
     assert cors.is_allowed_origin(None) is True
     monkeypatch.setattr(cors.settings, "environment", "production")
     assert cors.is_allowed_origin(None) is False
+
+
+# --- regressions -----------------------------------------------------------
+
+def test_a_refused_join_closes_with_its_own_code(client, monkeypatch):
+    """The close code is the whole message. uvicorn tears down an endpoint that
+    returns without closing, but with 1006 (abnormal) — which every sane client
+    reads as a network glitch and answers by reconnecting. A peer refused on
+    policy would then retry forever against a cap that will never admit it."""
+    def refuse(**_):
+        raise JoinRejected("room_full", cursors.CLOSE_TRY_LATER)
+
+    monkeypatch.setattr(cursors.hub, "join", refuse)
+    with pytest.raises(WebSocketDisconnect) as excinfo:
+        with client.websocket_connect("/site/ws/cursors") as ws:
+            assert ws.receive_json() == {"t": "error", "code": "room_full"}
+            ws.receive_json()
+    assert excinfo.value.code == cursors.CLOSE_TRY_LATER
+
+
+@pytest.mark.parametrize("raw", ["nan", "inf", "1e999"])
+def test_non_finite_cursor_settings_are_refused_at_startup(raw, monkeypatch):
+    """`v <= 0` cannot catch these: every comparison against NaN is False, so a
+    typo'd CURSOR_TICK_HZ would reach the broadcast loop and sleep for NaN."""
+    monkeypatch.setenv("CURSOR_TICK_HZ", raw)
+    with pytest.raises(ValueError, match="finite"):
+        Settings()

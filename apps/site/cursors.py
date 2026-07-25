@@ -488,7 +488,13 @@ async def cursors_ws(websocket: WebSocket):
         # the frontend nothing about whether retrying is worth it.
         with contextlib.suppress(Exception):
             await websocket.send_text(json.dumps({"t": "error", "code": rejected.reason}))
-            await websocket.close(code=rejected.close_code)
+        # Closed outside that suppress, and it matters: if the client vanished
+        # between accept() and the error frame, sharing one suppress would skip
+        # the close entirely. uvicorn tears the socket down regardless, but with
+        # 1006 (abnormal) — the one code a client reads as "network glitch, retry".
+        # A peer refused on policy would then reconnect forever against a cap
+        # that will never let it in.
+        await _close_quietly(websocket, rejected.close_code)
         return
 
     _writers[peer.id] = asyncio.create_task(_writer(peer))

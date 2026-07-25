@@ -7,6 +7,7 @@ specific values it requires, so the fail-fast behaviour is preserved while the
 config lives in one typed place.
 """
 
+import math
 from functools import lru_cache
 from typing import Any
 
@@ -170,6 +171,12 @@ class Settings(BaseSettings):
     )
     @classmethod
     def _check_positive(cls, v: float, info) -> float:
+        # Checked first, because `v <= 0` cannot catch it: pydantic parses
+        # CURSOR_TICK_HZ=nan into a float, and every comparison against NaN is
+        # False — so it passes the guard below and then makes the broadcast loop
+        # sleep for NaN. "inf" and "1e999" get through the same way.
+        if not math.isfinite(v):
+            raise ValueError(f"{info.field_name.upper()} must be a finite number")
         # Zero is the dangerous value, not negative: CURSOR_TICK_HZ=0 divides by
         # zero in the broadcast loop and CURSOR_MAX_CONNECTIONS=0 rejects every
         # visitor — both are misconfigurations that should stop the process at
