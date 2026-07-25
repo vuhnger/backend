@@ -9,8 +9,9 @@ from uuid import uuid4
 
 import aiofiles
 import filetype
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
 from fastapi.responses import FileResponse
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from apps.projects.models import Project
@@ -35,6 +36,12 @@ UPLOAD_DIR = settings.upload_dir
 UPLOAD_BASE_URL = settings.upload_base_url
 ALLOWED_TYPES = {"image/jpeg", "image/png", "image/webp", "image/gif"}
 MAX_FILE_SIZE = 10 * 1024 * 1024  # 10 MB
+
+# The list endpoints used to end in a bare .all(). The table is small today, but
+# an unbounded query is a latent outage: it grows into one silently, and the
+# strava app already caps its own listing at 200 for exactly this reason.
+DEFAULT_PAGE_SIZE = 50
+MAX_PAGE_SIZE = 200
 
 # Hardened app: CORS, cache-control, security headers, and locally-served docs
 # (matches the other services; a strict CSP would block CDN-hosted Swagger).
@@ -63,27 +70,39 @@ def health():
 
 
 @router.get("", response_model=list[ProjectResponse])
-def list_published_projects(db: Session = Depends(get_db)):
+def list_published_projects(
+    db: Session = Depends(get_db),
+    limit: int = Query(DEFAULT_PAGE_SIZE, ge=1, le=MAX_PAGE_SIZE),
+    offset: int = Query(0, ge=0),
+):
     """
-    List all published projects.
+    List published projects, newest-ordered.
     Sorted by order (ascending), then by created_at (descending).
     """
     projects = (
         db.query(Project)
         .filter(Project.published == True)
         .order_by(Project.order.asc(), Project.created_at.desc())
+        .offset(offset)
+        .limit(limit)
         .all()
     )
     return projects
 
 
 @router.get("/featured", response_model=list[ProjectResponse])
-def list_featured_projects(db: Session = Depends(get_db)):
-    """List all featured projects (for homepage display)."""
+def list_featured_projects(
+    db: Session = Depends(get_db),
+    limit: int = Query(DEFAULT_PAGE_SIZE, ge=1, le=MAX_PAGE_SIZE),
+    offset: int = Query(0, ge=0),
+):
+    """List featured projects (for homepage display)."""
     projects = (
         db.query(Project)
         .filter(Project.published == True, Project.featured == True)
         .order_by(Project.order.asc())
+        .offset(offset)
+        .limit(limit)
         .all()
     )
     return projects
@@ -123,11 +142,15 @@ def get_project(slug: str, db: Session = Depends(get_db)):
 def list_all_projects(
     api_key: str = Depends(get_api_key),
     db: Session = Depends(get_db),
+    limit: int = Query(DEFAULT_PAGE_SIZE, ge=1, le=MAX_PAGE_SIZE),
+    offset: int = Query(0, ge=0),
 ):
-    """List all projects including unpublished (admin only)."""
+    """List projects including unpublished (admin only)."""
     projects = (
         db.query(Project)
         .order_by(Project.order.asc(), Project.created_at.desc())
+        .offset(offset)
+        .limit(limit)
         .all()
     )
     return projects
@@ -153,14 +176,16 @@ def create_project(
     db: Session = Depends(get_db),
 ):
     """Create a new project."""
-    # Check for duplicate slug
-    existing = db.query(Project).filter(Project.slug == project_data.slug).first()
-    if existing:
-        raise HTTPException(status_code=400, detail="Slug already exists")
-
     project = Project(**project_data.model_dump())
     db.add(project)
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError:
+        # Let the database's unique constraint be the arbiter instead of a
+        # preceding SELECT: between the check and the insert, a concurrent create
+        # of the same slug slipped through and surfaced as an unhandled 500.
+        db.rollback()
+        raise HTTPException(status_code=400, detail="Slug already exists") from None
     db.refresh(project)
     return project
 
@@ -177,18 +202,17 @@ def update_project(
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
 
-    # Check for slug conflict if changing slug
-    if project_data.slug and project_data.slug != slug:
-        existing = db.query(Project).filter(Project.slug == project_data.slug).first()
-        if existing:
-            raise HTTPException(status_code=400, detail="Slug already exists")
-
     # Update only provided fields
     update_data = project_data.model_dump(exclude_unset=True)
     for key, value in update_data.items():
         setattr(project, key, value)
 
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError:
+        # Same race as create: the unique constraint decides, not a prior SELECT.
+        db.rollback()
+        raise HTTPException(status_code=400, detail="Slug already exists") from None
     db.refresh(project)
     return project
 
