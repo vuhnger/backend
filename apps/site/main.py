@@ -16,6 +16,7 @@ from pydantic import BaseModel
 
 from apps.shared.app_factory import create_app, include_versioned
 from apps.shared.config import settings
+from apps.shared.net import client_ip
 from apps.shared.notifications import notifier
 
 logger = logging.getLogger(__name__)
@@ -47,13 +48,6 @@ class VisitIn(BaseModel):
     # `location.pathname + location.search` from the frontend to get campaign data.
     path: str | None = None
     referrer: str | None = None
-
-
-def _client_ip(request: Request) -> str:
-    forwarded = request.headers.get("x-forwarded-for")
-    if forwarded:
-        return forwarded.split(",")[0].strip()
-    return request.client.host if request.client else "unknown"
 
 
 def _looks_like_bot(user_agent: str) -> bool:
@@ -146,7 +140,7 @@ def health():
 def visit(payload: VisitIn, request: Request, background_tasks: BackgroundTasks):
     """Fire-and-forget beacon: returns 200 immediately; notification runs in the
     background, and only for a genuine, non-throttled, non-excluded visitor."""
-    ip = _client_ip(request)
+    ip = client_ip(request)
     user_agent = request.headers.get("user-agent", "")
     if (
         not _looks_like_bot(user_agent)

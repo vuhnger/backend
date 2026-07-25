@@ -45,25 +45,25 @@ services:
 
   strava-api:
     <<: *app-base
-    command: ["uvicorn", "apps.strava.main:app", "--host", "0.0.0.0", "--port", "5001", "--reload"]
+    command: ["uvicorn", "apps.strava.main:app", "--host", "0.0.0.0", "--port", "5001", "--reload", "--proxy-headers", "--forwarded-allow-ips", "*"]
     ports:
       - "127.0.0.1:5001:5001"
 
   wakatime-api:
     <<: *app-base
-    command: ["uvicorn", "apps.wakatime.main:app", "--host", "0.0.0.0", "--port", "5002", "--reload"]
+    command: ["uvicorn", "apps.wakatime.main:app", "--host", "0.0.0.0", "--port", "5002", "--reload", "--proxy-headers", "--forwarded-allow-ips", "*"]
     ports:
       - "127.0.0.1:5002:5002"
 
   n8n-api:
     <<: *app-base
-    command: ["uvicorn", "apps.n8n.main:app", "--host", "0.0.0.0", "--port", "5004", "--reload"]
+    command: ["uvicorn", "apps.n8n.main:app", "--host", "0.0.0.0", "--port", "5004", "--reload", "--proxy-headers", "--forwarded-allow-ips", "*"]
     ports:
       - "127.0.0.1:5004:5004"
 
   projects-api:
     <<: *app-base
-    command: ["uvicorn", "apps.projects.main:app", "--host", "0.0.0.0", "--port", "5005", "--reload"]
+    command: ["uvicorn", "apps.projects.main:app", "--host", "0.0.0.0", "--port", "5005", "--reload", "--proxy-headers", "--forwarded-allow-ips", "*"]
     environment:
       DATABASE_URL: postgresql+psycopg2://${POSTGRES_USER:-backend_user}:${POSTGRES_PASSWORD:-changeme}@db:5432/${POSTGRES_DB:-backend_db}
       ENVIRONMENT: development

@@ -1,3 +1,9 @@
+# Every app runs `uvicorn … --proxy-headers --forwarded-allow-ips "*"`. Without it
+# uvicorn ignores X-Forwarded-For, so request.client.host — and therefore every
+# access-log line — reads as the docker gateway instead of the real visitor.
+# Trusting "*" is safe here: the ports below are bound to 127.0.0.1, so only caddy
+# can reach them, and caddy overwrites X-Forwarded-For rather than appending to a
+# client-supplied value.
 services:
   db:
     image: postgres:16-alpine
@@ -18,7 +24,7 @@ services:
 
   strava-api:
     image: ghcr.io/vuhnger/backend:${BACKEND_TAG:-latest}
-    command: ["uvicorn", "apps.strava.main:app", "--host", "0.0.0.0", "--port", "5001"]
+    command: ["uvicorn", "apps.strava.main:app", "--host", "0.0.0.0", "--port", "5001", "--proxy-headers", "--forwarded-allow-ips", "*"]
     restart: unless-stopped
     ports:
       - "127.0.0.1:5001:5001"
@@ -55,7 +61,7 @@ services:
 
   n8n-api:
     image: ghcr.io/vuhnger/backend:${BACKEND_TAG:-latest}
-    command: ["uvicorn", "apps.n8n.main:app", "--host", "0.0.0.0", "--port", "5004"]
+    command: ["uvicorn", "apps.n8n.main:app", "--host", "0.0.0.0", "--port", "5004", "--proxy-headers", "--forwarded-allow-ips", "*"]
     restart: unless-stopped
     ports:
       - "127.0.0.1:5004:5004"
@@ -72,7 +78,7 @@ services:
 
   wakatime-api:
     image: ghcr.io/vuhnger/backend:${BACKEND_TAG:-latest}
-    command: ["uvicorn", "apps.wakatime.main:app", "--host", "0.0.0.0", "--port", "5002"]
+    command: ["uvicorn", "apps.wakatime.main:app", "--host", "0.0.0.0", "--port", "5002", "--proxy-headers", "--forwarded-allow-ips", "*"]
     restart: unless-stopped
     ports:
       - "127.0.0.1:5002:5002"
@@ -100,7 +106,7 @@ services:
 
   projects-api:
     image: ghcr.io/vuhnger/backend:${BACKEND_TAG:-latest}
-    command: ["uvicorn", "apps.projects.main:app", "--host", "0.0.0.0", "--port", "5005"]
+    command: ["uvicorn", "apps.projects.main:app", "--host", "0.0.0.0", "--port", "5005", "--proxy-headers", "--forwarded-allow-ips", "*"]
     restart: unless-stopped
     ports:
       - "127.0.0.1:5005:5005"
@@ -127,7 +133,7 @@ services:
   # Visitor beacon → pushes a notification on a new visit (no DB; ntfy via config).
   site-api:
     image: ghcr.io/vuhnger/backend:${BACKEND_TAG:-latest}
-    command: ["uvicorn", "apps.site.main:app", "--host", "0.0.0.0", "--port", "5006"]
+    command: ["uvicorn", "apps.site.main:app", "--host", "0.0.0.0", "--port", "5006", "--proxy-headers", "--forwarded-allow-ips", "*"]
     restart: unless-stopped
     ports:
       - "127.0.0.1:5006:5006"
