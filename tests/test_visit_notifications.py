@@ -64,10 +64,10 @@ def notifier_mock(monkeypatch):
     return mock
 
 
-def _post(ip: str, ua: str = "Mozilla/5.0"):
+def _post(ip: str, ua: str = "Mozilla/5.0", referrer: str = "google.com", path: str = "/projects"):
     return TestClient(site.app).post(
         "/site/visit",
-        json={"path": "/projects", "referrer": "google.com"},
+        json={"path": path, "referrer": referrer},
         headers={"x-forwarded-for": ip, "user-agent": ua},
     )
 
@@ -92,3 +92,25 @@ def test_excluded_ip_is_ignored(notifier_mock, monkeypatch):
     monkeypatch.setattr(site.settings, "visit_notify_exclude_ips", "9.9.9.6")
     _post("9.9.9.6")
     assert notifier_mock.send.call_count == 0
+
+
+# --- traffic source --------------------------------------------------------
+
+@pytest.mark.parametrize(
+    ("referrer", "path", "expected"),
+    [
+        ("https://news.ycombinator.com/item?id=1", "/", "news.ycombinator.com"),
+        (None, "/?utm_source=linkedin", "linkedin (utm)"),
+        (None, "/?ref=cv", "cv (utm)"),
+        ("https://t.co/x", "/?utm_source=twitter", "t.co · twitter"),
+        (None, "/projects", "direct / unknown"),  # never silent
+        ("", None, "direct / unknown"),
+    ],
+)
+def test_source_is_always_reported(referrer, path, expected):
+    assert site._source(referrer, path) == expected
+
+
+def test_notification_body_always_carries_a_source(notifier_mock):
+    _post("9.9.9.5", referrer="", path="/")  # browser sent no referrer at all
+    assert "↩︎ direct / unknown" in notifier_mock.send.call_args.args[0]
