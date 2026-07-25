@@ -6,7 +6,10 @@ requires-python = ">=3.11,<3.12"
 dependencies = [
     # FastAPI and web server. Pydantic 2 + a Starlette new enough for httpx 0.28
     # (which dropped the TestClient `app=` shortcut).
-    "fastapi>=0.115,<1.0",
+    # Pinned exactly: an unpinned minor bump to 0.139 changed how include_router()
+    # wraps routes, which silently disabled slowapi's rate limiting in production
+    # while the tests stayed green. Bumps go through a PR, not through resolution.
+    "fastapi==0.139.2",
     "uvicorn[standard]==0.51.0",
     "pydantic>=2.7,<3.0",
     # Database
@@ -25,7 +28,9 @@ dependencies = [
     "python-multipart==0.0.31",
     "alembic>=1.18.5",
     "filetype>=1.2.0",
-    "slowapi>=0.1.10",
+    # Rate limiting is built straight on `limits` (see apps/shared/rate_limit.py);
+    # slowapi was dropped because its route-introspection approach broke silently.
+    "limits==5.8.0",
     "pydantic-settings>=2.14.2",
     "structlog>=26.1.0",
 ]
