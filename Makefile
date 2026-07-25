@@ -1,13 +1,20 @@
 # Local development helpers. Run `make help` for the list.
 DEV := docker compose -f docker-compose.dev.yml
 
-.PHONY: help dev-up dev-up-build dev-down dev-logs dev-ps dev-restart dev-psql headers migrate migration migrate-down db-stamp hooks
+.PHONY: help dev-up dev-up-build dev-down dev-logs dev-ps dev-restart dev-psql headers migrate migration migrate-down db-stamp hooks skill-scan skill-audit
 
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN{FS=":.*?## "}{printf "  \033[36m%-16s\033[0m %s\n", $$1, $$2}'
 
 hooks: ## Install the git pre-commit hooks (ruff + mypy, mirrors CI)
 	uv run pre-commit install
+
+skill-scan: ## Vet an agent skill before installing it: make skill-scan target=<path|url>
+	@test -n "$(target)" || { echo 'usage: make skill-scan target=<path|url>'; exit 2; }
+	tools/skill-scan.sh "$(target)"
+
+skill-audit: ## Scan every agent skill installed under ~/.claude
+	tools/skill-scan.sh --installed
 
 dev-up: ## Start the local stack (db + all apps, hot-reload) and apply migrations
 	$(DEV) up -d
