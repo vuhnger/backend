@@ -70,10 +70,15 @@ reload() {
     # pressure (see ops/README.md). The admin API runs inside the existing caddy
     # process and needs no fork, so it still works when systemctl does not.
     log "systemctl reload failed; falling back to the admin API"
+    # A timeout or refused connection makes curl exit non-zero, which under
+    # `set -e` would kill the script at the assignment -- before the HTTP check
+    # below could say why. Catch the transport failure separately.
     local code
-    code="$(curl -s -o /dev/null -w '%{http_code}' --max-time 30 \
+    if ! code="$(curl -sS -o /dev/null -w '%{http_code}' --max-time 30 \
         -X POST -H 'Content-Type: application/json' \
-        --data-binary "@$adapted" "$ADMIN/load")"
+        --data-binary "@$adapted" "$ADMIN/load")"; then
+        die "could not reach the admin API at $ADMIN"
+    fi
 
     [[ "$code" == "200" ]] || die "admin API load returned HTTP $code"
     log "reloaded via admin API"
@@ -91,11 +96,19 @@ verify() {
         die "could not read running config from the admin API"
     }
 
+    # Compare every top-level section the Caddyfile actually declares -- apps, but
+    # also logging and admin -- rather than apps alone, which would call a reload
+    # that changed only logging a success. Sections present solely in the running
+    # config are Caddy's own defaults and would produce false mismatches, so they
+    # are not required to appear in the adapted output.
     if python3 -c '
 import json, sys
 with open(sys.argv[1]) as f: want = json.load(f)
 with open(sys.argv[2]) as f: live = json.load(f)
-sys.exit(0 if want.get("apps") == live.get("apps") else 1)
+missing = [k for k, v in want.items() if live.get(k) != v]
+if missing:
+    print("sections that did not take: " + ", ".join(sorted(missing)), file=sys.stderr)
+sys.exit(1 if missing else 0)
 ' "$adapted" "$live"; then
         log "running config matches $CADDYFILE"
         rm -f "$live"

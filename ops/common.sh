@@ -25,7 +25,12 @@ log() {
 }
 
 die() {
-    log "FATAL: $*" >&2
+    local message="FATAL: $*"
+    log "$message" >&2
+    # These scripts run unattended. A fatal error that only reaches a log file
+    # nobody reads is a silent failure -- the exact class of problem they exist
+    # to catch. Never let a failed notification mask the original error.
+    send_notification "$message" || true
     exit 1
 }
 
@@ -44,6 +49,13 @@ send_notification() {
 
     webhook_url="$(<"$WEBHOOK_FILE")"
 
+    # Anything but a plain https URL is either a corrupted file or an attempt to
+    # smuggle extra directives into the curl config below.
+    if [[ "$webhook_url" != https://* || "$webhook_url" == *[\"\\]* ]]; then
+        log "cannot notify: webhook file does not contain a plain https URL" >&2
+        return 1
+    fi
+
     if (( ${#message} > MAX_MESSAGE_CHARS )); then
         message="${message:0:$MAX_MESSAGE_CHARS}"$'\n[...avkortet]'
     fi
@@ -59,9 +71,13 @@ print(json.dumps({"content": os.environ["CONTENT"]}))
         return 1
     }
 
-    curl -fsS --max-time 15 --retry 2 --retry-delay 3 \
-        -H "Content-Type: application/json" \
-        -d "$payload" "$webhook_url" >/dev/null
+    # The URL is the secret, so it must not become a curl argument: argv is world
+    # readable through `ps` and /proc for every user on the box. Feeding it as a
+    # curl config file on stdin keeps it out of the process table entirely.
+    printf 'url = "%s"\n' "$webhook_url" \
+        | curl -fsS --max-time 15 --retry 2 --retry-delay 3 \
+            -H "Content-Type: application/json" \
+            -d "$payload" --config - >/dev/null
 }
 
 # require_cmd <name>...
@@ -83,11 +99,20 @@ LOCK_DIR="${LOCK_DIR:-$HOME/.local/state/backend-ops}"
 hold_lock() {
     local name="$1"
     local lockfile="$LOCK_DIR/$name.lock"
+    local rc=0
 
+    require_cmd flock
     mkdir -p "$LOCK_DIR" || die "cannot create lock directory: $LOCK_DIR"
     exec 9>"$lockfile" || die "cannot open lock file: $lockfile"
-    flock -n 9 || {
-        log "another instance is already running ($lockfile); exiting"
-        exit 0
-    }
+
+    # Give contention its own exit code. A bare `flock -n 9 || exit 0` cannot tell
+    # "another copy is running" from "flock is broken", so any operational failure
+    # would look like a healthy skip and the job would quietly do nothing -- every
+    # night, without a single alert.
+    flock -n --conflict-exit-code 66 9 || rc=$?
+    case "$rc" in
+        0)  ;;
+        66) log "another instance is already running ($lockfile); exiting"; exit 0 ;;
+        *)  die "could not acquire lock $lockfile (flock exited $rc)" ;;
+    esac
 }

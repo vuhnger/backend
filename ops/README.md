@@ -71,7 +71,7 @@ The ones worth knowing:
 
 | Variable | Default | Meaning |
 |---|---|---|
-| `DISK_WARN_PCT` | `85` | Alert above this fill level |
+| `DISK_WARN_PCT` | `80` | Alert above this fill level — set to the level the 2026-07-25 incident reached, so the default catches the failure this table's first row describes |
 | `MEM_MIN_MB` | `250` | Alert below this much available memory |
 | `PID1_MAX_MB` | `200` | Alert if systemd exceeds this (normal is ~15 MB) |
 | `UNITS_MAX` | `1000` | Alert on unit-tombstone accumulation |
@@ -97,10 +97,15 @@ in the right one.
 
 ```bash
 ls -lt /mnt/docker-data/backups/postgres/
+
+# Pick one from that listing. Quoted in a variable, because an unquoted
+# <placeholder> pasted into a shell is parsed as a redirection, not a filename.
+DUMP=/mnt/docker-data/backups/postgres/backend_db-20260725T091048Z.dump
+
 docker compose stop strava-api wakatime-api projects-api site-api n8n-api
 docker exec -i backend-db-1 sh -c \
   'pg_restore -U "$POSTGRES_USER" -d "$POSTGRES_DB" --clean --if-exists' \
-  < /mnt/docker-data/backups/postgres/backend_db-<stamp>.dump
+  < "$DUMP"
 docker compose start strava-api wakatime-api projects-api site-api n8n-api
 ```
 
@@ -138,5 +143,8 @@ Three things bite anyone repeating this move:
   `--force-recreate` is what actually applies it. Check with
   `docker inspect <c> --format '{{.HostConfig.LogConfig.Config}}'`.
 
-Verify a move with a `--dry-run --itemize-changes` rsync (must print nothing) rather
-than comparing `du` output, which differs across filesystems and hardlinks.
+Verify a move with a `--dry-run --itemize-changes` rsync, which must emit no
+itemized change lines, rather than comparing `du` output — that differs across
+filesystems and hardlinks and proved useless here (6.4G running vs 2.5G stopped for
+the same tree). Keep `-v`/`--stats` off the verification run: they add a summary to
+otherwise empty output, so an "is this empty?" test would never pass.

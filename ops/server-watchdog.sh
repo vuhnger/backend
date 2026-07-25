@@ -19,7 +19,9 @@ set -euo pipefail
 
 . "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/common.sh"
 
-DISK_WARN_PCT="${DISK_WARN_PCT:-85}"
+# 80, not 85: the incident this script was written for was a root disk at 80%,
+# and a default that would have slept through it is not a default.
+DISK_WARN_PCT="${DISK_WARN_PCT:-80}"
 MEM_MIN_MB="${MEM_MIN_MB:-250}"
 PID1_MAX_MB="${PID1_MAX_MB:-200}"
 UNITS_MAX="${UNITS_MAX:-1000}"
@@ -102,7 +104,9 @@ check_disk() {
     local mount pct
     for mount in / /mnt/docker-data; do
         [[ -d "$mount" ]] || continue
-        pct="$(df -P "$mount" 2>/dev/null | awk 'NR==2 {gsub(/%/,"",$5); print $5}')"
+        # `set -o pipefail` makes a failing df abort the assignment, and `set -e`
+        # would then kill the whole watchdog run rather than skip one mount.
+        pct="$(df -P "$mount" 2>/dev/null | awk 'NR==2 {gsub(/%/,"",$5); print $5}')" || pct=""
         [[ -n "$pct" ]] || continue
         (( pct >= DISK_WARN_PCT )) && problem "Disk $mount er ${pct}% full (grense ${DISK_WARN_PCT}%)"
     done
@@ -130,10 +134,19 @@ check_memory() {
 # The 2026-07-25 leak in one check: PID 1 grew to 890 MB because failed transient
 # units are retained in memory forever. Both numbers are flat on a healthy box.
 check_systemd() {
-    local pid1_mb units failed
-    pid1_mb=$(( $(awk '{print $1}' <<< "$(ps -o rss= -p 1)") / 1024 ))
-    units="$(systemctl list-units --all --plain --no-pager 2>/dev/null | wc -l)"
-    failed="$(systemctl --failed --plain --no-pager 2>/dev/null | grep -c '\.service' || true)"
+    local pid1_kb pid1_mb units failed
+    # Under memory pressure -- the very condition being measured -- systemctl is
+    # what fails first. Letting that abort the run would silence the watchdog at
+    # exactly the moment it matters, so an unreadable value becomes a finding.
+    pid1_kb="$(ps -o rss= -p 1 2>/dev/null | awk '{print $1}')" || pid1_kb=""
+    units="$(systemctl list-units --all --plain --no-pager 2>/dev/null | wc -l)" || units=""
+    failed="$(systemctl --failed --plain --no-pager 2>/dev/null | grep -c '\.service')" || failed=0
+
+    if [[ -z "$pid1_kb" || -z "$units" ]]; then
+        problem "Fikk ikke lest systemd-tall (ps/systemctl svarte ikke) -- selve verktøyet kan være rammet"
+        return 0
+    fi
+    pid1_mb=$(( pid1_kb / 1024 ))
 
     (( pid1_mb > PID1_MAX_MB )) && problem "systemd (PID 1) bruker ${pid1_mb} MB (normalt ~15 MB) -- kjør 'systemctl reset-failed' så 'daemon-reexec'"
     (( units > UNITS_MAX )) && problem "${units} systemd-units lastet (grense ${UNITS_MAX}) -- gravsteiner hoper seg opp"
@@ -155,8 +168,11 @@ check_caddy() {
 check_certs() {
     local host expiry_date expiry_epoch days
     for host in $CERT_HOSTS; do
+        # An unreachable host makes this pipeline fail, and with `pipefail` the
+        # assignment fails with it -- killing the entire watchdog before it could
+        # report the unreachable host. Empty means "could not probe", handled below.
         expiry_date="$(echo | timeout 15 openssl s_client -connect "$host:443" -servername "$host" 2>/dev/null \
-            | openssl x509 -noout -enddate 2>/dev/null | cut -d= -f2)"
+            | openssl x509 -noout -enddate 2>/dev/null | cut -d= -f2)" || expiry_date=""
 
         if [[ -z "$expiry_date" ]]; then
             problem "Fikk ikke hentet sertifikat for $host"
@@ -199,10 +215,15 @@ report() {
 
     if (( count == 0 )); then
         log "alle sjekker OK"
-        # Only announce recovery if there was something to recover from.
+        # Only announce recovery if there was something to recover from -- and
+        # only clear the state once the announcement actually went out, so a
+        # failed delivery is retried instead of being forgotten.
         if [[ -s "$STATE_FILE" ]]; then
-            notify ":white_check_mark: **Alt friskt igjen** på $(hostname)"
-            rm -f "$STATE_FILE"
+            if (( DRY_RUN )); then
+                log "(dry-run: ville meldt at alt er friskt igjen)"
+            elif notify ":white_check_mark: **Alt friskt igjen** på $(hostname)"; then
+                rm -f "$STATE_FILE"
+            fi
         fi
         return 0
     fi
@@ -234,15 +255,20 @@ report() {
         return 0
     fi
 
-    notify ":warning: **${count} problem(er)** på $(hostname)
+    # Record the alert as sent only if it was. Otherwise an undelivered warning
+    # would start the REMIND_HOURS clock and suppress every retry for half a day.
+    if notify ":warning: **${count} problem(er)** på $(hostname)
 
-$body"
-
-    printf '%s\n%s\n' "$fingerprint" "$(date +%s)" > "$STATE_FILE"
+$body"; then
+        printf '%s\n%s\n' "$fingerprint" "$(date +%s)" > "$STATE_FILE"
+    fi
 }
 
 notify() {
-    send_notification "$1" || log "ADVARSEL: kunne ikke levere varselet" >&2
+    if ! send_notification "$1"; then
+        log "ADVARSEL: kunne ikke levere varselet" >&2
+        return 1
+    fi
 }
 
 main "$@"
