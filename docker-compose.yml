@@ -23,7 +23,7 @@ services:
     ports:
       - "127.0.0.1:5001:5001"
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:5001/strava/openapi.json', timeout=4).status==200 else 1)"]
+      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:5001/strava/health', timeout=4).status==200 else 1)"]
       interval: 30s
       timeout: 5s
       retries: 3
@@ -60,7 +60,7 @@ services:
     ports:
       - "127.0.0.1:5004:5004"
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:5004/n8n/openapi.json', timeout=4).status==200 else 1)"]
+      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:5004/n8n/health', timeout=4).status==200 else 1)"]
       interval: 30s
       timeout: 5s
       retries: 3
@@ -77,7 +77,7 @@ services:
     ports:
       - "127.0.0.1:5002:5002"
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:5002/wakatime/openapi.json', timeout=4).status==200 else 1)"]
+      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:5002/wakatime/health', timeout=4).status==200 else 1)"]
       interval: 30s
       timeout: 5s
       retries: 3
@@ -105,7 +105,7 @@ services:
     ports:
       - "127.0.0.1:5005:5005"
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:5005/projects/openapi.json', timeout=4).status==200 else 1)"]
+      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:5005/projects/health', timeout=4).status==200 else 1)"]
       interval: 30s
       timeout: 5s
       retries: 3
@@ -132,7 +132,7 @@ services:
     ports:
       - "127.0.0.1:5006:5006"
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:5006/site/openapi.json', timeout=4).status==200 else 1)"]
+      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:5006/site/health', timeout=4).status==200 else 1)"]
       interval: 30s
       timeout: 5s
       retries: 3
