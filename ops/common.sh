@@ -72,12 +72,19 @@ require_cmd() {
     done
 }
 
+# Locks live under $HOME, not /var/lock: that directory is root-owned, so these
+# scripts cannot create a lock file there and would abort on every cron run.
+LOCK_DIR="${LOCK_DIR:-$HOME/.local/state/backend-ops}"
+
 # Single-instance guard. A backup that overruns its hour must not have a second
 # copy started on top of it.
 #
-#   hold_lock /var/lock/pg-backup.lock
+#   hold_lock pg-backup
 hold_lock() {
-    local lockfile="$1"
+    local name="$1"
+    local lockfile="$LOCK_DIR/$name.lock"
+
+    mkdir -p "$LOCK_DIR" || die "cannot create lock directory: $LOCK_DIR"
     exec 9>"$lockfile" || die "cannot open lock file: $lockfile"
     flock -n 9 || {
         log "another instance is already running ($lockfile); exiting"

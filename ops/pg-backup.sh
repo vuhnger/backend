@@ -29,7 +29,7 @@ STAMP_FILE="${STAMP_FILE:-$BACKUP_DIR/.last-success}"
 main() {
     require_cmd docker flock
 
-    hold_lock /var/lock/pg-backup.lock
+    hold_lock pg-backup
 
     mkdir -p "$BACKUP_DIR"
 

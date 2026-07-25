@@ -23,14 +23,18 @@ PG_IMAGE="${PG_IMAGE:-postgres:16-alpine}"
 SCRATCH_NAME="restore-test-$$"
 READY_TIMEOUT="${READY_TIMEOUT:-60}"
 
+# A fixed name in /tmp is a symlink someone else can plant; mktemp is not.
+ERR_FILE="$(mktemp)"
+
 cleanup() {
     docker rm -f "$SCRATCH_NAME" >/dev/null 2>&1 || true
+    rm -f "$ERR_FILE"
 }
 trap cleanup EXIT
 
 main() {
     require_cmd docker flock
-    hold_lock /var/lock/pg-restore-test.lock
+    hold_lock pg-restore-test
 
     local dump
     dump="${1:-$(newest_dump)}"
@@ -42,12 +46,12 @@ main() {
     wait_ready
 
     if ! docker exec -i "$SCRATCH_NAME" \
-        pg_restore -U postgres -d postgres --no-owner --no-privileges < "$dump" 2>/tmp/restore-test.err; then
+        pg_restore -U postgres -d postgres --no-owner --no-privileges < "$dump" 2>"$ERR_FILE"; then
         # pg_restore warns about things that do not matter here (missing roles,
         # extension ownership). Only a hard failure to produce tables is fatal,
         # so fall through to the table count rather than trusting the exit code.
         log "pg_restore exited non-zero; checking whether the schema arrived anyway"
-        log "$(tail -5 /tmp/restore-test.err 2>/dev/null || true)"
+        log "$(tail -5 "$ERR_FILE" 2>/dev/null || true)"
     fi
 
     local restored expected
