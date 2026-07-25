@@ -40,6 +40,11 @@ class Settings(BaseSettings):
     rate_limit_default: str = "120/minute"
     rate_limit_storage_uri: str | None = None
 
+    # Largest request body any app will accept, in bytes. Sized just above the
+    # projects app's 10 MB image limit to leave room for multipart overhead;
+    # everything else needs far less.
+    max_request_body_bytes: int = 11 * 1024 * 1024
+
     # Strava OAuth
     strava_client_id: str | None = None
     strava_client_secret: str | None = None

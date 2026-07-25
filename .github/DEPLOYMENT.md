@@ -81,6 +81,22 @@ handle_path /n8n/* {
 }
 ```
 
+## Kroppsstørrelse på requests (Caddy)
+
+Appene avviser selv requests som *oppgir* en `Content-Length` over
+`MAX_REQUEST_BODY_BYTES` (default 11 MB). En request som utelater headeren og
+bruker chunked transfer-encoding kan ikke vurderes på forhånd — der er Caddy
+eneste forsvar. Legg derfor dette i `api.vuhnger.dev`-blokka i Caddyfile:
+
+```
+request_body {
+    max_size 11MB
+}
+```
+
+Uten den kan en uautentisert klient strømme vilkårlig mange GB inn på disken før
+noe lag rekker å avvise den.
+
 ## Feilsøking
 
 Hvis deployment feiler:
