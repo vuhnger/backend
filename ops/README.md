@@ -107,3 +107,36 @@ docker compose start strava-api wakatime-api projects-api site-api n8n-api
 Backups are on `/dev/sdb`, a separate physical volume from the root disk, but still
 on this host. They protect against a deleted volume, a bad migration, and disk
 corruption — not against losing the VM. Off-site copies are not set up.
+
+## Where Docker keeps its data
+
+Since 2026-07-25 the data-root is `/mnt/docker-data/docker` on `/dev/sdb`, not
+`/var/lib/docker`. `/etc/docker/daemon.json`:
+
+```json
+{
+  "data-root": "/mnt/docker-data/docker",
+  "log-driver": "json-file",
+  "log-opts": { "max-size": "10m", "max-file": "3" }
+}
+```
+
+Root went from 81% to 69%. Note that both the images and the backups now sit on the
+same physical volume — a `/dev/sdb` failure takes out both at once.
+
+Three things bite anyone repeating this move:
+
+- **SELinux is Enforcing.** A fresh directory is `unlabeled_t` and Docker cannot
+  use it. `semanage fcontext -a -e /var/lib/docker <path>` then `restorecon -R`.
+- **`systemctl stop docker` does not keep it stopped.** `docker.socket` is
+  socket-activated, so any docker client — or one `systemctl start docker` from
+  someone who noticed the site was down — restarts the daemon and lets Postgres
+  write into the tree being copied. `systemctl mask docker.service docker.socket`
+  for the duration, and verify with `pgrep containerd-shim` before copying.
+- **`log-opts` apply at container creation, not start.** `docker compose up -d`
+  reuses existing containers and silently keeps the old unlimited logging;
+  `--force-recreate` is what actually applies it. Check with
+  `docker inspect <c> --format '{{.HostConfig.LogConfig.Config}}'`.
+
+Verify a move with a `--dry-run --itemize-changes` rsync (must print nothing) rather
+than comparing `du` output, which differs across filesystems and hardlinks.
