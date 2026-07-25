@@ -40,15 +40,19 @@ class Settings(BaseSettings):
     rate_limit_default: str = "120/minute"
     rate_limit_storage_uri: str | None = None
 
-    # Strava OAuth
+    # Strava OAuth. The owner id is optional: the first account to authorize
+    # becomes the owner, and every later callback must match it. Set it explicitly
+    # only to re-establish ownership after the auth row has been wiped.
     strava_client_id: str | None = None
     strava_client_secret: str | None = None
     strava_redirect_uri: str | None = None
+    strava_owner_athlete_id: str | None = None
 
-    # WakaTime OAuth
+    # WakaTime OAuth (same ownership rule as Strava above).
     wakatime_client_id: str | None = None
     wakatime_client_secret: str | None = None
     wakatime_redirect_uri: str | None = None
+    wakatime_owner_user_id: str | None = None
 
     # Projects uploads
     upload_dir: str = "/home/rocky/uploads/projects"

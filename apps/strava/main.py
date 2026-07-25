@@ -19,6 +19,7 @@ from apps.shared.auth import get_api_key
 from apps.shared.config import settings
 from apps.shared.database import check_db_connection, get_db
 from apps.shared.errors import log_and_sanitize_error
+from apps.shared.oauth_owner import enforce_owner
 from apps.shared.oauth_state import generate_state, validate_state
 from apps.strava.models import StravaActivity, StravaAuth, StravaStats
 from apps.strava.tasks import fetch_and_cache_stats
@@ -127,6 +128,17 @@ def oauth_callback(
             athlete = client.get_athlete()
             athlete_id = athlete.id
 
+        # This endpoint is public, so the account behind the exchange has to be
+        # checked before it can replace the stored grant.
+        enforce_owner(
+            db=db,
+            model=StravaAuth,
+            id_field="athlete_id",
+            incoming_id=athlete_id,
+            configured_owner=settings.strava_owner_athlete_id,
+            provider="strava",
+        )
+
         # Store in database (single user, id=1) using atomic upsert
         from apps.shared.encryption import encrypt_token
         from apps.shared.upsert import atomic_upsert_auth
@@ -144,6 +156,11 @@ def oauth_callback(
             },
         )
         db.commit()
+    except HTTPException:
+        # A deliberate rejection (e.g. wrong account) must reach the caller as
+        # itself, not be reshaped into a 500 by the handler below.
+        db.rollback()
+        raise
     except Exception as e:
         # Rollback any pending database changes to maintain session consistency
         db.rollback()
