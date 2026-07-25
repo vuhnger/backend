@@ -8,6 +8,7 @@ for this single-worker deployment.
 
 import logging
 import time
+from urllib.parse import parse_qs, urlsplit
 
 import httpx
 from fastapi import APIRouter, BackgroundTasks, Request
@@ -36,7 +37,14 @@ _BOT_MARKERS = (
 )
 
 
+# Query params that identify a traffic source. They survive where document.referrer
+# doesn't, so they're the fallback when the browser sends no referrer.
+_CAMPAIGN_PARAMS = ("utm_source", "ref", "source")
+
+
 class VisitIn(BaseModel):
+    # `path` may include the query string (e.g. "/?utm_source=linkedin") — send
+    # `location.pathname + location.search` from the frontend to get campaign data.
     path: str | None = None
     referrer: str | None = None
 
@@ -82,14 +90,49 @@ def _geo(ip: str) -> str:
         return ""
 
 
+def _campaign(path: str | None) -> str:
+    """The utm_source/ref value from the visited URL's query string, or ''."""
+    if not path or "?" not in path:
+        return ""
+    params = parse_qs(urlsplit(path).query)
+    for key in _CAMPAIGN_PARAMS:
+        values = params.get(key)
+        if values and values[0]:
+            return values[0][:60]
+    return ""
+
+
+def _source(referrer: str | None, path: str | None) -> str:
+    """Where the visitor came from — always a non-empty, human-readable string.
+
+    ``document.referrer`` is empty for direct visits, bookmarks, and any client
+    sending ``Referrer-Policy: no-referrer`` (most in-app browsers strip it), so we
+    fall back to campaign params and otherwise say "unknown" explicitly. Staying
+    silent would make "no referrer" indistinguishable from "beacon didn't send it".
+    """
+    campaign = _campaign(path)
+    if referrer:
+        host = urlsplit(referrer).netloc or referrer
+        return f"{host} · {campaign}" if campaign else host
+    if campaign:
+        return f"{campaign} (utm)"
+    return "direct / unknown"
+
+
 def _notify_visit(ip: str, user_agent: str, path: str | None, referrer: str | None) -> None:
     where = _geo(ip)
     device = "mobile" if "mobi" in user_agent.lower() else "desktop"
+    source = _source(referrer, path)
+    # Logged without the IP on purpose: geo is enough to recognise a visit later,
+    # and the raw address is personal data we have no reason to retain.
+    logger.info(
+        "visit notified: path=%s source=%s geo=%s device=%s",
+        path or "/", source, where or "?", device,
+    )
     lines = [f"👤 New visit: {path or '/'}"]
     if where:
         lines.append(f"📍 {where}")
-    if referrer:
-        lines.append(f"↩︎ from {referrer}")
+    lines.append(f"↩︎ {source}")
     lines.append(f"🖥 {device}")
     notifier.send("\n".join(lines), title="vuhnger.dev", tags=["wave"])
 
