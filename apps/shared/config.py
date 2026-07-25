@@ -9,6 +9,7 @@ config lives in one typed place.
 
 from functools import lru_cache
 
+from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -53,6 +54,20 @@ class Settings(BaseSettings):
     strava_redirect_uri: str | None = None
     strava_owner_athlete_id: str | None = None
 
+    # Strava heatmap privacy.
+    #
+    # Route tracks are absolute WGS84 and end up on a public page, so everything
+    # within `strava_privacy_radius_m` of the home coordinate is clipped out of
+    # every track before it is aggregated. Both values live here and are never
+    # echoed in any response — publishing the radius would let a caller
+    # triangulate the centre it was measured from.
+    #
+    # No default coordinate exists on purpose: /strava/heatmap refuses to serve
+    # (503) rather than emit unclipped tracks if this is unconfigured.
+    strava_home_lat: float | None = None
+    strava_home_lng: float | None = None
+    strava_privacy_radius_m: float = 500.0
+
     # WakaTime OAuth (same ownership rule as Strava above).
     wakatime_client_id: str | None = None
     wakatime_client_secret: str | None = None
@@ -79,9 +94,44 @@ class Settings(BaseSettings):
     # this at an HTTPS provider to stop leaking visitor IPs in the clear.
     geo_lookup_url: str = "http://ip-api.com/json/{ip}"
 
+    @field_validator("strava_home_lat")
+    @classmethod
+    def _check_lat(cls, v: float | None) -> float | None:
+        if v is not None and not -90.0 <= v <= 90.0:
+            raise ValueError("STRAVA_HOME_LAT must be between -90 and 90")
+        return v
+
+    @field_validator("strava_home_lng")
+    @classmethod
+    def _check_lng(cls, v: float | None) -> float | None:
+        if v is not None and not -180.0 <= v <= 180.0:
+            raise ValueError("STRAVA_HOME_LNG must be between -180 and 180")
+        return v
+
+    @field_validator("strava_privacy_radius_m")
+    @classmethod
+    def _check_radius(cls, v: float) -> float:
+        # A zero or negative radius would silently disable the clipping that the
+        # whole feature depends on, so it's a startup error rather than a no-op.
+        if v <= 0:
+            raise ValueError("STRAVA_PRIVACY_RADIUS_M must be greater than 0")
+        return v
+
     @property
     def is_production(self) -> bool:
         return self.environment == "production"
+
+    @property
+    def strava_home_coordinate(self) -> tuple[float, float] | None:
+        """Home ``(lat, lng)``, or None when the pair isn't fully configured.
+
+        Both halves are required: a latitude without a longitude is a
+        misconfiguration, and treating it as "partially set" would be the one
+        way untrimmed tracks could slip out.
+        """
+        if self.strava_home_lat is None or self.strava_home_lng is None:
+            return None
+        return (self.strava_home_lat, self.strava_home_lng)
 
     @property
     def excluded_visit_ips(self) -> set[str]:

@@ -10,6 +10,7 @@ the security hardening can never silently drift between apps.
 """
 
 from fastapi import APIRouter, FastAPI
+from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.openapi.docs import get_swagger_ui_oauth2_redirect_html
 from fastapi.staticfiles import StaticFiles
 
@@ -66,6 +67,14 @@ def create_app(
     app.add_middleware(
         BodySizeLimitMiddleware, max_bytes=settings.max_request_body_bytes
     )
+
+    # Compress responses here rather than relying on the reverse proxy: Caddy
+    # doesn't compress unless explicitly told to, and that config lives outside
+    # this repo. The route-geometry endpoint is ~1.3 MB uncompressed and ~230 KB
+    # gzipped, which is the difference between comfortably meeting the frontend's
+    # 5 s budget on mobile and not. The threshold keeps small JSON responses
+    # untouched, where compression would cost more than it saves.
+    app.add_middleware(GZipMiddleware, minimum_size=1024)
 
     # Serve Swagger UI assets locally (no third-party CDN) so the strict CSP applies.
     app.mount("/static", StaticFiles(directory="static"), name="static")

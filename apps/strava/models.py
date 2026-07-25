@@ -2,7 +2,7 @@
 Strava database models for OAuth tokens and cached statistics
 """
 from cryptography.fernet import InvalidToken
-from sqlalchemy import JSON, BigInteger, Column, DateTime, Float, Integer, String, func
+from sqlalchemy import JSON, BigInteger, Column, DateTime, Float, Integer, String, Text, func
 
 from apps.shared.database import Base
 from apps.shared.encryption import decrypt_token, encrypt_token
@@ -105,7 +105,17 @@ class StravaActivity(Base):
     average_heartrate = Column(Float, nullable=True)
     max_heartrate = Column(Float, nullable=True)
     kudos_count = Column(Integer, default=0)
-    
+
+    # Raw absolute WGS84 route, exactly as Strava sends it in the activity list.
+    # NULL for activities recorded without GPS (treadmill).
+    #
+    # Stored raw and aggregated on the way out: the home coordinate and privacy
+    # radius live in config and must be changeable without a re-sync, so
+    # /strava/heatmap derives its grid per request. This column is the untrimmed
+    # original and is deliberately absent from `to_dict` — it must never reach a
+    # client.
+    summary_polyline = Column(Text, nullable=True)
+
     # Metadata
     fetched_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
