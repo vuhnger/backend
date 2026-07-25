@@ -18,9 +18,13 @@ dependencies = [
     # External APIs. stravalib 2.x is a pydantic-2 rewrite (plain-number
     # quantities, changed iterators) — see apps/strava/client.py.
     "stravalib>=2.5,<3.0",
-    # httpx is our sole HTTP client (sync + async). `requests` is no longer a
-    # direct dependency — it stays in the lock only as a stravalib transitive.
+    # httpx is our sole HTTP client for code we write (sync + async).
     "httpx>=0.28,<0.29",
+    # Direct again, but only to subclass requests.Session: stravalib talks to
+    # Strava through `requests` and never passes a timeout, and requests exposes
+    # the timeout per-call only — so the session is the one place to inject a
+    # default. See apps/strava/client_factory.py.
+    "requests>=2.32,<3.0",
     # Security
     "cryptography==48.0.1",
     # File handling

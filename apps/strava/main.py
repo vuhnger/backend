@@ -12,7 +12,6 @@ from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
 from fastapi.responses import FileResponse, RedirectResponse
 from sqlalchemy import desc, extract, func
 from sqlalchemy.orm import Session
-from stravalib.client import Client
 
 from apps.shared.app_factory import create_app, include_versioned
 from apps.shared.auth import get_api_key
@@ -21,6 +20,7 @@ from apps.shared.database import check_db_connection, get_db
 from apps.shared.errors import log_and_sanitize_error
 from apps.shared.oauth_owner import enforce_owner
 from apps.shared.oauth_state import generate_state, validate_state
+from apps.strava.client_factory import strava_client
 from apps.strava.models import StravaActivity, StravaAuth, StravaStats
 from apps.strava.tasks import fetch_and_cache_stats
 
@@ -109,7 +109,7 @@ def oauth_callback(
 
     try:
         # Exchange code for tokens
-        client = Client()
+        client = strava_client()
         token_response = client.exchange_code_for_token(
             client_id=client_id, client_secret=client_secret, code=code
         )
