@@ -55,6 +55,9 @@ class Settings(BaseSettings):
     wakatime_client_secret: str | None = None
     wakatime_redirect_uri: str | None = None
 
+    # n8n upstream the health proxy checks. Was hardcoded in apps/n8n/main.py.
+    n8n_url: str | None = "https://n8n.vuhnger.dev"
+
     # Projects uploads
     upload_dir: str = "/home/rocky/uploads/projects"
     upload_base_url: str = "https://api.vuhnger.dev/uploads/projects"

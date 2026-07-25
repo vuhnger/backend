@@ -7,9 +7,10 @@ Provides a health check endpoint that verifies n8n.vuhnger.dev is operational.
 import logging
 
 import httpx
-from fastapi import APIRouter
+from fastapi import APIRouter, Response, status
 
 from apps.shared.app_factory import create_app, include_versioned
+from apps.shared.config import settings
 
 logger = logging.getLogger(__name__)
 
@@ -23,29 +24,47 @@ router = APIRouter(prefix="/n8n", tags=["n8n"])
 
 
 @router.get("/health")
-async def health():
-    """Health check endpoint - verifies n8n.vuhnger.dev is reachable"""
+def health():
+    """This service's own liveness — deliberately independent of the upstream.
+
+    The container healthcheck polls this, and autoheal restarts anything that
+    reports unhealthy. Reporting the *upstream's* state here would therefore make
+    a down n8n restart this container in a loop. See /upstream for that.
+    """
+    return {"status": "ok", "service": "n8n"}
+
+
+@router.get("/upstream")
+async def upstream(response: Response):
+    """Whether the configured n8n instance is reachable.
+
+    Answers 503 when it isn't. This used to return HTTP 200 with a
+    ``{"status": "error"}`` body, which no monitor treats as a failure — so the
+    endpoint reported an outage that nothing could act on.
+    """
+    url = settings.n8n_url
+    if not url:
+        response.status_code = status.HTTP_503_SERVICE_UNAVAILABLE
+        return {"status": "unconfigured", "service": "n8n"}
+
     try:
         async with httpx.AsyncClient(timeout=5.0) as client:
-            response = await client.get("https://n8n.vuhnger.dev")
+            upstream_response = await client.get(url)
+    except httpx.HTTPError as e:
+        logger.warning("n8n upstream unreachable: %s", type(e).__name__)
+        response.status_code = status.HTTP_503_SERVICE_UNAVAILABLE
+        return {"status": "unreachable", "service": "n8n", "url": url}
 
-            if response.status_code == 200:
-                return {"status": "ok", "service": "n8n", "url": "n8n.vuhnger.dev"}
-            else:
-                return {
-                    "status": "degraded",
-                    "service": "n8n",
-                    "url": "n8n.vuhnger.dev",
-                    "http_status": response.status_code,
-                }
-    except Exception as e:
-        logger.error(f"n8n health check failed: {str(e)}")
+    if upstream_response.status_code != 200:
+        response.status_code = status.HTTP_503_SERVICE_UNAVAILABLE
         return {
-            "status": "error",
+            "status": "degraded",
             "service": "n8n",
-            "url": "n8n.vuhnger.dev",
-            "error": "unreachable",
+            "url": url,
+            "http_status": upstream_response.status_code,
         }
+
+    return {"status": "ok", "service": "n8n", "url": url}
 
 
 include_versioned(app, router)
