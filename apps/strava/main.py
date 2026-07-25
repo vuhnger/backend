@@ -5,12 +5,18 @@ OAuth integration for Strava with cached statistics.
 Single user mode - stores one set of tokens and serves cached data.
 """
 
+import hashlib
+import hmac
 import logging
+import secrets
+from collections import OrderedDict
 from datetime import datetime
+from threading import Lock
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
-from fastapi.responses import FileResponse, RedirectResponse
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Request, Response
+from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
 from sqlalchemy import desc, extract, func
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from apps.shared.app_factory import create_app, include_versioned
@@ -21,10 +27,59 @@ from apps.shared.errors import log_and_sanitize_error
 from apps.shared.oauth_owner import enforce_owner
 from apps.shared.oauth_state import generate_state, validate_state
 from apps.strava.client_factory import strava_client
+from apps.strava.geometry import HEATMAP_CELL_SIZE_M, build_heatmap
 from apps.strava.models import StravaActivity, StravaAuth, StravaStats
 from apps.strava.tasks import fetch_and_cache_stats
 
 logger = logging.getLogger(__name__)
+
+# Bump when the shape or the derivation of /strava/heatmap changes, so every
+# cached copy revalidates instead of serving a grid built by older rules.
+HEATMAP_PAYLOAD_VERSION = "1"
+
+# Cached hard, because the aggregate is almost entirely immutable: a finished
+# run's track never changes, so only a newly logged activity can move it, and
+# that just adds counts. An hour of staleness on the newest run is a fair price
+# for the frontend usually paying nothing at all. `stale-while-revalidate` then
+# lets a shared cache serve the old copy instantly while it refreshes in the
+# background, so even revalidation never lands in the client's 5 s budget.
+HEATMAP_CACHE_CONTROL = "public, max-age=3600, stale-while-revalidate=86400"
+
+# ETag key. The tag commits to the home coordinate and privacy radius so a config
+# change invalidates every cached response — but those are low-entropy values, and
+# a plain digest of them could be brute-forced back out of a public header. Keying
+# the digest with a server secret makes that impossible. Falls back to a
+# per-process random key when no secret is configured: ETags then reset on
+# restart, which costs a revalidation and leaks nothing.
+_ETAG_KEY = (settings.state_secret or secrets.token_urlsafe(32)).encode()
+
+# Aggregating every track is the one genuinely expensive thing this service
+# does, and the ETag already captures exactly what the result depends on — so it
+# doubles as the cache key: if the tag matches, the cached body is valid by
+# construction. A handful of entries covers the realistic query variants
+# (all types, Run, Ride) across a config change.
+#
+# A lock rather than a bare dict because sync endpoints run in a threadpool and
+# OrderedDict.move_to_end is not atomic.
+_HEATMAP_CACHE: OrderedDict[str, dict] = OrderedDict()
+_HEATMAP_CACHE_MAX = 8
+_HEATMAP_CACHE_LOCK = Lock()
+
+
+def _heatmap_cache_get(etag: str) -> dict | None:
+    with _HEATMAP_CACHE_LOCK:
+        payload = _HEATMAP_CACHE.get(etag)
+        if payload is not None:
+            _HEATMAP_CACHE.move_to_end(etag)
+        return payload
+
+
+def _heatmap_cache_put(etag: str, payload: dict) -> None:
+    with _HEATMAP_CACHE_LOCK:
+        _HEATMAP_CACHE[etag] = payload
+        _HEATMAP_CACHE.move_to_end(etag)
+        while len(_HEATMAP_CACHE) > _HEATMAP_CACHE_MAX:
+            _HEATMAP_CACHE.popitem(last=False)
 
 # Schema is managed by Alembic migrations (`alembic upgrade head`), not created
 # at import time. See alembic/ and `make migrate`.
@@ -391,6 +446,156 @@ def get_all_activities_endpoint(
         "offset": offset,
         "data": [a.to_dict() for a in activities],
     }
+
+
+def _weak_etag(*parts: object) -> str:
+    """Build a weak, secret-keyed ETag from the values a response depends on.
+
+    Weak (`W/`) because gzip means the same resource ships as more than one byte
+    sequence; a strong tag is supposed to identify exact bytes. Weak is what
+    cache revalidation needs anyway — it asserts semantic equivalence.
+    """
+    payload = "|".join(str(p) for p in parts).encode()
+    digest = hmac.new(_ETAG_KEY, payload, hashlib.sha256).hexdigest()[:32]
+    return f'W/"{digest}"'
+
+
+def _strip_weak(tag: str) -> str:
+    return tag[2:] if tag.startswith("W/") else tag
+
+
+def _etag_matches(if_none_match: str | None, etag: str) -> bool:
+    """RFC 9110 If-None-Match check: comma-separated list, `*`, weak `W/` prefix.
+
+    Both sides are normalised — comparing a `W/`-prefixed tag against stripped
+    candidates would never match, and the endpoint would answer 200 forever.
+    """
+    if not if_none_match:
+        return False
+    candidates = [c.strip() for c in if_none_match.split(",")]
+    if "*" in candidates:
+        return True
+    return _strip_weak(etag) in {_strip_weak(c) for c in candidates}
+
+
+@router.get("/heatmap")
+def get_heatmap(
+    request: Request,
+    activity_type: str | None = Query(None, max_length=50, description="e.g. Run; omit for all types."),
+    db: Session = Depends(get_db),
+):
+    """Aggregated heat grid over every GPS-recorded activity, all years.
+
+    Returns:
+
+        {
+          "cell_size_m": 15,
+          "bounds": [min_lng, min_lat, max_lng, max_lat],   // null when empty
+          "max_count": 87,
+          "activity_count": 512,
+          "total_distance_m": 4210000,
+          "cells": [[lng, lat, count], ...]
+        }
+
+    `cells` are `[lng, lat, count]` triples rather than objects — with hundreds
+    of thousands of cells, repeated key names would dominate the payload. Four
+    decimals resolve to ~11 m, finer than the 15 m cell.
+
+    `count` is how many *activities* touched a cell, not how many GPS samples
+    landed in it. Sample density tracks pace, so counting samples would highlight
+    where the running is slowest rather than where it is most frequent.
+
+    `activity_count` and `total_distance_m` describe every activity matching the
+    filter, including ones without GPS; the cells necessarily derive only from
+    the subset that has a track.
+
+    Privacy: each track is clipped against the configured home coordinate before
+    aggregation (apps/strava/geometry.clip_home_area), and the aggregate itself
+    carries no timestamps, activity IDs, or point ordering — individual runs
+    cannot be reconstructed from it. Neither the home coordinate nor the radius
+    appears in the response. If the coordinate is unconfigured this returns 503
+    rather than aggregate unclipped tracks: absence of config must never degrade
+    into absence of privacy.
+
+    Status codes are meaningful: 200 with `cells: []` means the filter matched
+    nothing (or nothing had GPS), while 503 means nothing has been synced yet,
+    the database is unreachable, or the privacy clipping is unconfigured.
+    """
+    home = settings.strava_home_coordinate
+    if home is None:
+        logger.error(
+            "Refusing to serve heatmap: STRAVA_HOME_LAT/STRAVA_HOME_LNG are not configured"
+        )
+        raise HTTPException(
+            status_code=503,
+            detail="Heatmap is unavailable: privacy clipping is not configured.",
+        )
+    radius_m = settings.strava_privacy_radius_m
+
+    try:
+        query = db.query(StravaActivity)
+        if activity_type:
+            query = query.filter(StravaActivity.type == activity_type)
+
+        # One pass for the summary figures and the cache validator.
+        # `max(fetched_at)` over the filtered set changes exactly when one of
+        # these rows is re-synced, which is the only way the aggregate can move.
+        activity_count, total_distance, last_synced = query.with_entities(
+            func.count(StravaActivity.id),
+            func.coalesce(func.sum(StravaActivity.distance), 0.0),
+            func.max(StravaActivity.fetched_at),
+        ).one()
+
+        if activity_count == 0 and db.query(StravaActivity.id).first() is None:
+            raise HTTPException(
+                status_code=503,
+                detail="Activity data has not been synced yet. Try again shortly.",
+            )
+
+        etag = _weak_etag(
+            HEATMAP_PAYLOAD_VERSION,
+            activity_type,
+            HEATMAP_CELL_SIZE_M,
+            home[0],
+            home[1],
+            radius_m,
+            activity_count,
+            total_distance,
+            last_synced,
+        )
+        headers = {"ETag": etag, "Cache-Control": HEATMAP_CACHE_CONTROL}
+
+        if _etag_matches(request.headers.get("if-none-match"), etag):
+            return Response(status_code=304, headers=headers)
+
+        cached = _heatmap_cache_get(etag)
+        if cached is not None:
+            return JSONResponse(content=cached, headers=headers)
+
+        # Only the polyline column — the rest of the row is dead weight when
+        # hundreds of activities are being aggregated.
+        polylines = [row[0] for row in query.with_entities(StravaActivity.summary_polyline).all()]
+    except SQLAlchemyError as e:
+        sanitized_msg, _ = log_and_sanitize_error(
+            e, "Heatmap query", "Heatmap is temporarily unavailable"
+        )
+        raise HTTPException(status_code=503, detail=sanitized_msg)
+
+    grid = build_heatmap(polylines, home, radius_m)
+    payload = {
+        "cell_size_m": HEATMAP_CELL_SIZE_M,
+        "bounds": grid["bounds"],
+        "max_count": grid["max_count"],
+        "activity_count": activity_count,
+        "total_distance_m": round(float(total_distance)),
+        "cells": grid["cells"],
+    }
+    _heatmap_cache_put(etag, payload)
+
+    # No response_model: pydantic would re-validate hundreds of thousands of
+    # numbers per request for no gain. The shape is built in one place here and
+    # covered by tests instead.
+    return JSONResponse(content=payload, headers=headers)
 
 
 @router.post("/refresh-data")

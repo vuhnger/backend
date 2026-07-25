@@ -11,6 +11,22 @@ from apps.strava.client_factory import strava_client
 from apps.strava.utils import get_valid_token
 
 
+def _summary_polyline(activity) -> str | None:
+    """Pull the route polyline off a SummaryActivity, if it has one.
+
+    Strava includes this in the *list* response, so no extra request per
+    activity is needed — important, because the API allows only 100 calls per
+    15 minutes and a per-activity fetch would blow through that on one sync.
+
+    Activities recorded without GPS (treadmill) come back with the map present
+    but the polyline empty; normalise that to None.
+    """
+    activity_map = getattr(activity, "map", None)
+    if activity_map is None:
+        return None
+    return getattr(activity_map, "summary_polyline", None) or None
+
+
 def get_ytd_stats(db: Session) -> dict[str, dict[str, Any]]:
     """
     Fetch year-to-date statistics from Strava.
@@ -129,6 +145,7 @@ def get_all_activities(db: Session, limit: int = None, after=None):
     activities = client.get_activities(limit=limit, after=after)
 
     for activity in activities:
+        polyline = _summary_polyline(activity)
         yield {
             "id": activity.id,
             "name": activity.name,
@@ -144,5 +161,6 @@ def get_all_activities(db: Session, limit: int = None, after=None):
             "max_speed": float(activity.max_speed) if activity.max_speed else 0.0,
             "average_heartrate": float(activity.average_heartrate) if hasattr(activity, 'average_heartrate') and activity.average_heartrate else None,
             "max_heartrate": float(activity.max_heartrate) if hasattr(activity, 'max_heartrate') and activity.max_heartrate else None,
-            "kudos_count": int(activity.kudos_count) if hasattr(activity, 'kudos_count') else 0
+            "kudos_count": int(activity.kudos_count) if hasattr(activity, 'kudos_count') else 0,
+            "summary_polyline": polyline,
         }
