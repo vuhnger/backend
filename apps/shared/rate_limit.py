@@ -10,31 +10,23 @@ low-traffic deployment; point `RATE_LIMIT_STORAGE_URI` at Redis if it ever runs
 multi-worker and the limit needs to be shared.
 """
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
-from slowapi.util import get_remote_address
 
 from apps.shared.config import settings
-
-
-def _client_ip(request: Request) -> str:
-    """Real client IP, honouring the reverse proxy.
-
-    Behind caddy, `request.client.host` is the proxy (127.0.0.1), which would put
-    every caller in one bucket. Prefer the first hop in X-Forwarded-For.
-    """
-    forwarded = request.headers.get("x-forwarded-for")
-    if forwarded:
-        return forwarded.split(",")[0].strip()
-    return get_remote_address(request)
+from apps.shared.net import client_ip
 
 
 def setup_rate_limiting(app: FastAPI) -> Limiter:
-    """Attach a per-IP rate limiter with a sensible default to every route."""
+    """Attach a per-IP rate limiter with a sensible default to every route.
+
+    Keyed by ``apps.shared.net.client_ip`` — without it every caller behind caddy
+    would share one bucket and a single visitor could rate-limit the whole site.
+    """
     limiter = Limiter(
-        key_func=_client_ip,
+        key_func=client_ip,
         default_limits=[settings.rate_limit_default],
         storage_uri=settings.rate_limit_storage_uri,  # None -> in-memory
         headers_enabled=True,  # emit X-RateLimit-* response headers
