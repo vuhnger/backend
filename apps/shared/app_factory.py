@@ -13,7 +13,9 @@ from fastapi import APIRouter, FastAPI
 from fastapi.openapi.docs import get_swagger_ui_oauth2_redirect_html
 from fastapi.staticfiles import StaticFiles
 
+from apps.shared.body_limit import BodySizeLimitMiddleware
 from apps.shared.cache_control_headers import setup_cache_control
+from apps.shared.config import settings
 from apps.shared.cors import setup_cors
 from apps.shared.logging_config import configure_logging
 from apps.shared.rate_limit import setup_rate_limiting
@@ -55,10 +57,15 @@ def create_app(
     )
 
     # Shared middleware, applied in one place so hardening can't drift per-app.
+    # The body cap is added last so it ends up outermost: an oversized request
+    # must be refused before any other layer — or FastAPI itself — reads it.
     setup_cors(app)
     setup_cache_control(app)
     setup_security_headers(app)
     setup_rate_limiting(app)
+    app.add_middleware(
+        BodySizeLimitMiddleware, max_bytes=settings.max_request_body_bytes
+    )
 
     # Serve Swagger UI assets locally (no third-party CDN) so the strict CSP applies.
     app.mount("/static", StaticFiles(directory="static"), name="static")
