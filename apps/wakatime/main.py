@@ -15,6 +15,7 @@ from apps.shared.config import settings
 from apps.shared.database import check_db_connection, get_db
 from apps.shared.encryption import encrypt_token
 from apps.shared.errors import log_and_sanitize_error
+from apps.shared.oauth_owner import enforce_owner
 from apps.shared.oauth_state import generate_state, validate_state
 from apps.shared.upsert import atomic_upsert_auth
 from apps.wakatime.models import WakaTimeAuth, WakaTimeStats
@@ -120,6 +121,17 @@ def oauth_callback(
         user_data = user_resp.json()["data"]
         user_id = user_data["id"]
 
+        # This endpoint is public, so the account behind the exchange has to be
+        # checked before it can replace the stored grant.
+        enforce_owner(
+            db=db,
+            model=WakaTimeAuth,
+            id_field="user_id",
+            incoming_id=user_id,
+            configured_owner=settings.wakatime_owner_user_id,
+            provider="wakatime",
+        )
+
         # Store in DB
         atomic_upsert_auth(
             db=db,
@@ -134,6 +146,11 @@ def oauth_callback(
         )
         db.commit()
 
+    except HTTPException:
+        # A deliberate rejection (e.g. wrong account) must reach the caller as
+        # itself, not be reshaped into a 500 by the handler below.
+        db.rollback()
+        raise
     except Exception as e:
         db.rollback()
         sanitized_msg, _ = log_and_sanitize_error(e, "WakaTime Auth", "Auth failed")
