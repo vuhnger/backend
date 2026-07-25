@@ -47,6 +47,27 @@ def get_allowed_origins() -> list[str]:
     return origins
 
 
+def is_allowed_origin(origin: str | None) -> bool:
+    """Om en Origin-header skal slippe til på en WebSocket.
+
+    WebSocket-handshaken er *unntatt* same-origin policy: browseren sender
+    Origin, men håndhever ingenting selv, og `CORSMiddleware` slipper gjennom
+    alt som ikke har `scope["type"] == "http"`. Uten denne sjekken kan en
+    hvilken som helst nettside åpne en kanal mot oss på besøkendes vegne.
+
+    Origin-listen er den samme som for HTTP, med vilje: to lister som kan drifte
+    fra hverandre er akkurat den slags forskjell ingen oppdager før den utnyttes.
+
+    En request helt uten Origin er ikke en browser (curl, en helsesjekk, en
+    test). I produksjon avvises den — det finnes ingen legitim ikke-browser-
+    klient for denne kanalen — mens den slippes gjennom lokalt der wscat og
+    TestClient er hvordan man faktisk feilsøker.
+    """
+    if origin is None:
+        return not settings.is_production
+    return origin.rstrip("/") in get_allowed_origins()
+
+
 def setup_cors(app: FastAPI) -> None:
     """Legg til CORS-middleware på en FastAPI-app."""
     app.add_middleware(

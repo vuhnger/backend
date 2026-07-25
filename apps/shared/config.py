@@ -107,6 +107,29 @@ class Settings(BaseSettings):
     visit_notify_throttle_seconds: int = 3600  # at most one ping per IP per hour
     visit_notify_exclude_ips: str = ""         # comma-separated IPs to ignore (e.g. yours)
 
+    # Live cursor presence (WebSocket). Every cap below is *per process*: the hub
+    # is in-memory, so two workers would each enforce its own limit and peers in
+    # the same room would never see each other. Single worker is a precondition,
+    # the same one the in-memory rate limiter already relies on.
+    cursor_max_connections: int = 200   # across every room in this process
+    cursor_max_per_room: int = 50
+    cursor_max_per_ip: int = 5          # one person's open tabs, not one person's site
+    cursor_max_rooms: int = 100
+    # Outbound batch rate. Clients may move the mouse at 60+ Hz; we collapse that
+    # to one frame per tick, so bandwidth scales with peers, not with mouse events.
+    cursor_tick_hz: float = 15.0
+    # Inbound cap per connection. Above it the socket is closed rather than
+    # throttled: a client past 60 msg/s is broken or hostile, not merely eager.
+    cursor_max_messages_per_second: float = 60.0
+    # Closed after this long without a single frame from the client. A backgrounded
+    # tab stops pinging and drops out, which is the correct presence semantic —
+    # protocol-level keepalive alone would hold its slot for hours.
+    cursor_idle_timeout_seconds: float = 900.0
+    # Frames buffered for a slow client before we give up on it. 64 at 15 Hz is
+    # ~4 s of backlog; anything further behind is a dead socket the OS hasn't
+    # noticed yet, and holding its queue only delays reclaiming the slot.
+    cursor_send_queue_size: int = 64
+
     # IP -> location lookup for the visit notification. `{ip}` is substituted with
     # a validated address. The default provider's free tier is HTTP-only; point
     # this at an HTTPS provider to stop leaking visitor IPs in the clear.
@@ -133,6 +156,26 @@ class Settings(BaseSettings):
         # whole feature depends on, so it's a startup error rather than a no-op.
         if v <= 0:
             raise ValueError("STRAVA_PRIVACY_RADIUS_M must be greater than 0")
+        return v
+
+    @field_validator(
+        "cursor_max_connections",
+        "cursor_max_per_room",
+        "cursor_max_per_ip",
+        "cursor_max_rooms",
+        "cursor_tick_hz",
+        "cursor_max_messages_per_second",
+        "cursor_idle_timeout_seconds",
+        "cursor_send_queue_size",
+    )
+    @classmethod
+    def _check_positive(cls, v: float, info) -> float:
+        # Zero is the dangerous value, not negative: CURSOR_TICK_HZ=0 divides by
+        # zero in the broadcast loop and CURSOR_MAX_CONNECTIONS=0 rejects every
+        # visitor — both are misconfigurations that should stop the process at
+        # startup rather than surface as a silently dead feature.
+        if v <= 0:
+            raise ValueError(f"{info.field_name.upper()} must be greater than 0")
         return v
 
     @property

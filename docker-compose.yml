@@ -141,7 +141,12 @@ services:
   # Visitor beacon → pushes a notification on a new visit (no DB; ntfy via config).
   site-api:
     image: ghcr.io/vuhnger/backend:${BACKEND_TAG:-latest}
-    command: ["uvicorn", "apps.site.main:app", "--host", "0.0.0.0", "--port", "5006", "--proxy-headers", "--forwarded-allow-ips", "*"]
+    # --timeout-graceful-shutdown is here and nowhere else: uvicorn's default is
+    # to wait indefinitely for open connections, which is harmless for request/
+    # response services but not for one holding WebSockets. A single client that
+    # ignores the close frame would otherwise pin the container until Docker's
+    # SIGKILL at 10s, turning every deploy into a hard kill.
+    command: ["uvicorn", "apps.site.main:app", "--host", "0.0.0.0", "--port", "5006", "--proxy-headers", "--forwarded-allow-ips", "*", "--timeout-graceful-shutdown", "5"]
     restart: unless-stopped
     ports:
       - "127.0.0.1:5006:5006"
@@ -156,6 +161,24 @@ services:
       NTFY_URL: ${NTFY_URL}
       VISIT_NOTIFY_THROTTLE_SECONDS: ${VISIT_NOTIFY_THROTTLE_SECONDS:-3600}
       VISIT_NOTIFY_EXCLUDE_IPS: ${VISIT_NOTIFY_EXCLUDE_IPS:-}
+
+      # CORS origin list for the cursor WebSocket. Same list as HTTP — this
+      # service has no env_file, so a name not spelled out here never reaches
+      # the container and the origin check silently falls back to the defaults.
+      FRONTEND_URL: ${FRONTEND_URL:-https://vuhnger.dev}
+
+      # Live cursor presence. Defaults in apps/shared/config.py are sized for
+      # this box; they are here so they can be turned down without a redeploy.
+      # Note the uvicorn command above runs a single worker, which the in-memory
+      # hub requires: a second worker would split the rooms in half.
+      CURSOR_MAX_CONNECTIONS: ${CURSOR_MAX_CONNECTIONS:-200}
+      CURSOR_MAX_PER_ROOM: ${CURSOR_MAX_PER_ROOM:-50}
+      CURSOR_MAX_PER_IP: ${CURSOR_MAX_PER_IP:-5}
+      CURSOR_MAX_ROOMS: ${CURSOR_MAX_ROOMS:-100}
+      CURSOR_TICK_HZ: ${CURSOR_TICK_HZ:-15}
+      CURSOR_MAX_MESSAGES_PER_SECOND: ${CURSOR_MAX_MESSAGES_PER_SECOND:-60}
+      CURSOR_IDLE_TIMEOUT_SECONDS: ${CURSOR_IDLE_TIMEOUT_SECONDS:-900}
+      CURSOR_SEND_QUEUE_SIZE: ${CURSOR_SEND_QUEUE_SIZE:-64}
     networks:
       - backend
 

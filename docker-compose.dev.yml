@@ -75,6 +75,15 @@ services:
     ports:
       - "127.0.0.1:5005:5005"
 
+  # The site service was previously prod-only, which made the visit beacon and
+  # the cursor WebSocket impossible to try locally. It needs no database, but it
+  # inherits the base anyway so it gets the source bind-mount and --reload.
+  site-api:
+    <<: *app-base
+    command: ["uvicorn", "apps.site.main:app", "--host", "0.0.0.0", "--port", "5006", "--reload", "--proxy-headers", "--forwarded-allow-ips", "*", "--timeout-graceful-shutdown", "5"]
+    ports:
+      - "127.0.0.1:5006:5006"
+
 networks:
   backend:
 
