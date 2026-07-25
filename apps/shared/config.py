@@ -67,6 +67,11 @@ class Settings(BaseSettings):
     visit_notify_throttle_seconds: int = 3600  # at most one ping per IP per hour
     visit_notify_exclude_ips: str = ""         # comma-separated IPs to ignore (e.g. yours)
 
+    # IP -> location lookup for the visit notification. `{ip}` is substituted with
+    # a validated address. The default provider's free tier is HTTP-only; point
+    # this at an HTTPS provider to stop leaking visitor IPs in the clear.
+    geo_lookup_url: str = "http://ip-api.com/json/{ip}"
+
     @property
     def is_production(self) -> bool:
         return self.environment == "production"
