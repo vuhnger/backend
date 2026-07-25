@@ -1,0 +1,60 @@
+name: Skill security
+
+# Gates agent skills (SKILL.md) committed to this repo. There are none today --
+# the job is a no-op that passes. It exists so the first one to land is scanned
+# before it merges, rather than after someone notices.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: skillscan-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  scan:
+    name: SkillSpector
+    runs-on: ubuntu-latest
+    env:
+      # Pinned to a commit, not a branch. SkillSpector publishes no tags, so an
+      # unpinned git+https install would let an upstream push silently change
+      # what gates this repo -- the supply-chain risk the scanner itself looks
+      # for. Bump this deliberately, in a PR.
+      SKILLSPECTOR_REF: fd25398d7aa99353d86237b9c260759351f0e644
+      # Accepted findings live in the repo, reviewed like any other change.
+      SKILL_SCAN_BASELINE_DIR: ${{ github.workspace }}/.skillspector/baselines
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
+        with:
+          enable-cache: true
+
+      - name: Install SkillSpector
+        run: |
+          uv tool install "skillspector @ git+https://github.com/NVIDIA/skillspector.git@${SKILLSPECTOR_REF}"
+          # uv tool installs into ~/.local/bin, which is not on the runner PATH.
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      - name: Scan skills committed to this repo
+        run: |
+          echo '### SkillSpector' >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          # rc captured explicitly: the runner shell is `bash -eo pipefail`, so
+          # without this the step dies at the pipe and the summary is never
+          # closed -- and a scan that never ran must not look like a clean one.
+          rc=0
+          tools/skill-scan.sh --repo | tee -a "$GITHUB_STEP_SUMMARY" || rc=$?
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          case "$rc" in
+            0) ;;
+            1) echo "::error::a skill in this repo scored at or above HIGH" ;;
+            *) echo "::error::the scan could not complete (exit $rc)" ;;
+          esac
+          exit "$rc"

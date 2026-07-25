@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "skillspector": {
+      "command": "skillspector",
+      "args": ["mcp"]
+    }
+  }
+}
