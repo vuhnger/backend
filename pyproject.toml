@@ -24,7 +24,7 @@ dependencies = [
     # Strava through `requests` and never passes a timeout, and requests exposes
     # the timeout per-call only — so the session is the one place to inject a
     # default. See apps/strava/client_factory.py.
-    "requests>=2.32,<3.0",
+    "requests>=2.34.2,<3.0",
     # Security
     "cryptography==50.0.0",
     # File handling
