@@ -9,7 +9,7 @@ dependencies = [
     # Pinned exactly: an unpinned minor bump to 0.139 changed how include_router()
     # wraps routes, which silently disabled slowapi's rate limiting in production
     # while the tests stayed green. Bumps go through a PR, not through resolution.
-    "fastapi==0.139.2",
+    "fastapi==0.141.1",
     "uvicorn[standard]==0.52.0",
     "pydantic>=2.7,<3.0",
     # Database
