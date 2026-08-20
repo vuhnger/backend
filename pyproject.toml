@@ -13,7 +13,7 @@ dependencies = [
     "uvicorn[standard]==0.52.0",
     "pydantic>=2.7,<3.0",
     # Database
-    "sqlalchemy>=2.0.35,<2.1",
+    "sqlalchemy>=2.0.52,<2.1",
     "psycopg2-binary==2.9.12",
     # External APIs. stravalib 2.x is a pydantic-2 rewrite (plain-number
     # quantities, changed iterators) — see apps/strava/client.py.
