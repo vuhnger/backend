@@ -11,7 +11,7 @@
 # it is unreachable from the host and from the other containers while it exists.
 #
 # Usage:  pg-restore-test.sh [path/to/dump]
-# Cron:   0 4 * * 0  /home/rocky/ops/pg-restore-test.sh >> /home/rocky/logs/pg-restore-test.log 2>&1
+# Cron:   0 4 * * 0  ~/backend/ops/pg-restore-test.sh >> ~/logs/pg-restore-test.log 2>&1
 
 set -euo pipefail
 

@@ -125,12 +125,12 @@ services:
       retries: 3
       start_period: 10s
     volumes:
-      - /home/rocky/uploads:/home/rocky/uploads
+      - ${UPLOAD_HOST_DIR:-./uploads}:/uploads
     environment:
       DATABASE_URL: postgresql+psycopg2://${POSTGRES_USER:-backend_user}:${POSTGRES_PASSWORD:-changeme}@db:5432/${POSTGRES_DB:-backend_db}
       ENVIRONMENT: ${ENVIRONMENT:-development}
       INTERNAL_API_KEY: ${INTERNAL_API_KEY}
-      UPLOAD_DIR: /home/rocky/uploads/projects
+      UPLOAD_DIR: /uploads/projects
       UPLOAD_BASE_URL: https://api.vuhnger.dev/uploads/projects
     depends_on:
       db:

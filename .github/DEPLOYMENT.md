@@ -11,8 +11,8 @@ For at automatisk deployment skal fungere, må følgende secrets være satt opp 
 Gå til **Settings** → **Secrets and variables** → **Actions** → **New repository secret**
 
 1. **SSH_HOST**
-   - Verdi: IP-adressen eller hostname til serveren (nrec)
-   - Eksempel: `158.39.xxx.xxx` eller `nrec.example.com`
+   - Verdi: IP-adressen eller hostname til serveren
+   - Eksempel: `164.92.191.246` eller `api.example.com`
 
 2. **SSH_USERNAME**
    - Verdi: Brukernavn for SSH-tilgang til serveren
@@ -48,7 +48,7 @@ Når du pusher til `main`:
 Du kan fortsatt deploye manuelt ved å:
 
 ```bash
-ssh nrec
+ssh <server>
 cd backend
 git pull origin main
 docker compose down && docker compose up -d --build

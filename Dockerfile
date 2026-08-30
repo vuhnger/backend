@@ -17,8 +17,12 @@ RUN uv sync --frozen
 
 COPY . .
 
-# Drop root. uid 1000 lines up with the host 'rocky' user that owns the
-# bind-mounted upload dir, so the projects app can still write uploads.
+# Identifies the image to Kamal, which refuses to deploy an image whose
+# service label does not match the service it is deploying.
+LABEL service="backend"
+
+# Drop root. uid 1000 is what the host directory bind-mounted at UPLOAD_DIR
+# must be owned by, so the projects app can still write uploads.
 RUN useradd -u 1000 -m appuser \
     && chown -R appuser:appuser /app /opt/venv
 USER appuser

@@ -13,7 +13,7 @@
 # act.
 #
 # Usage:  server-watchdog.sh [--dry-run]
-# Cron:   7 * * * *  /home/rocky/ops/server-watchdog.sh >> /home/rocky/logs/watchdog.log 2>&1
+# Cron:   7 * * * *  ~/backend/ops/server-watchdog.sh >> ~/logs/watchdog.log 2>&1
 
 set -euo pipefail
 

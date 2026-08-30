@@ -1,10 +1,10 @@
 # ops/
 
-Server-side operational scripts for the NREC host. They are not part of the
+Server-side operational scripts for whichever host runs the stack. They are not part of the
 application and are not deployed by `deploy.yml`; install them explicitly:
 
 ```bash
-ssh nrec
+ssh <server>
 cd ~/backend && git pull
 ops/install.sh
 ```
