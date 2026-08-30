@@ -10,7 +10,7 @@ dependencies = [
     # wraps routes, which silently disabled slowapi's rate limiting in production
     # while the tests stayed green. Bumps go through a PR, not through resolution.
     "fastapi==0.141.1",
-    "uvicorn[standard]==0.52.0",
+    "uvicorn[standard]==0.52.4",
     "pydantic>=2.7,<3.0",
     # Database
     "sqlalchemy>=2.0.52,<2.1",
