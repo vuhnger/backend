@@ -97,7 +97,7 @@ class Settings(BaseSettings):
     n8n_url: str | None = "https://n8n.vuhnger.dev"
 
     # Projects uploads
-    upload_dir: str = "/home/rocky/uploads/projects"
+    upload_dir: str = "/uploads/projects"
     upload_base_url: str = "https://api.vuhnger.dev/uploads/projects"
 
     # Notifications — ntfy topic URL, e.g. https://ntfy.sh/<secret-topic>.

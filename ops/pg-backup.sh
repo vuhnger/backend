@@ -9,7 +9,7 @@
 # or the process list.
 #
 # Usage:  pg-backup.sh
-# Cron:   30 2 * * *  /home/rocky/ops/pg-backup.sh >> /home/rocky/logs/pg-backup.log 2>&1
+# Cron:   30 2 * * *  ~/backend/ops/pg-backup.sh >> ~/logs/pg-backup.log 2>&1
 
 set -euo pipefail
 
