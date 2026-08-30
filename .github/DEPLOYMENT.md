@@ -1,106 +1,20 @@
-# Automatisk Deployment
+# Deployment
 
-Dette repoet bruker GitHub Actions for automatisk deployment til serveren når endringer pushes til `main`-branchen.
+Dette repoet bygger imaget, det deployer det ikke. `build-image.yml` kjører når
+CI er grønn på `main`, bygger imaget og pusher det til
+`ghcr.io/vuhnger/backend` med både commit-SHA og `latest` som tag.
 
-## Oppsett av GitHub Secrets
+Selve deployen ligger i [vuhnger/infra](https://github.com/vuhnger/infra) og
+kjøres med Kamal derfra. Denne kodebasen vet dermed ikke hvilken server den
+kjører på, og infra-repoet bygger aldri applikasjonskode.
 
-For at automatisk deployment skal fungere, må følgende secrets være satt opp i GitHub repository settings:
+## Hva imaget lover
 
-### Nødvendige Secrets
+Imaget har `LABEL service="backend"`, som Kamal krever, og en `HEALTHCHECK` som
+poller `HEALTH_URL` hvis den er satt. Kamal setter den per rolle, slik at
+Docker markerer en hengende container som unhealthy og `autoheal` restarter
+den.
 
-Gå til **Settings** → **Secrets and variables** → **Actions** → **New repository secret**
+## Migrasjoner
 
-1. **SSH_HOST**
-   - Verdi: IP-adressen eller hostname til serveren
-   - Eksempel: `164.92.191.246` eller `api.example.com`
-
-2. **SSH_USERNAME**
-   - Verdi: Brukernavn for SSH-tilgang til serveren
-   - Eksempel: `ubuntu` eller ditt brukernavn
-
-3. **SSH_PRIVATE_KEY**
-   - Verdi: Din private SSH-nøkkel for å koble til serveren
-   - For å finne nøkkelen din:
-     ```bash
-     cat ~/.ssh/id_rsa
-     # eller
-     cat ~/.ssh/id_ed25519
-     ```
-   - Kopier hele innholdet inkludert `-----BEGIN` og `-----END` linjene
-
-4. **SSH_PORT** (valgfri)
-   - Verdi: SSH-port (standard er 22)
-   - Kun nødvendig hvis serveren bruker en annen port
-
-## Slik fungerer det
-
-Når du pusher til `main`:
-
-1. GitHub Actions SSH-er inn på serveren
-2. Går til `backend`-mappen
-3. Kjører `git pull origin main` for å hente nyeste kode
-4. Stopper eksisterende Docker-containere med `docker compose down`
-5. Bygger og starter containere på nytt med `docker compose up -d --build`
-6. Viser de siste 50 linjene av loggene
-
-## Manuell deployment
-
-Du kan fortsatt deploye manuelt ved å:
-
-```bash
-ssh <server>
-cd backend
-git pull origin main
-docker compose down && docker compose up -d --build
-```
-
-## Oppsett av n8n health check
-
-For at n8n-statussjekken skal fungere, må du legge til n8n-tjenesten i `docker-compose.yml` på serveren:
-
-```yaml
-  n8n-api:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    command: ["uvicorn", "apps.n8n.main:app", "--host", "0.0.0.0", "--port", "5004"]
-    restart: unless-stopped
-    expose:
-      - "5004"
-    environment:
-      INTERNAL_API_KEY: ${INTERNAL_API_KEY}
-    networks:
-      - backend
-```
-
-Og legg til ruting i Caddyfile:
-
-```
-handle_path /n8n/* {
-    reverse_proxy n8n-api:5004
-}
-```
-
-## Kroppsstørrelse på requests (Caddy)
-
-Appene avviser selv requests som *oppgir* en `Content-Length` over
-`MAX_REQUEST_BODY_BYTES` (default 11 MB). En request som utelater headeren og
-bruker chunked transfer-encoding kan ikke vurderes på forhånd — der er Caddy
-eneste forsvar. Legg derfor dette i `api.vuhnger.dev`-blokka i Caddyfile:
-
-```
-request_body {
-    max_size 11MB
-}
-```
-
-Uten den kan en uautentisert klient strømme vilkårlig mange GB inn på disken før
-noe lag rekker å avvise den.
-
-## Feilsøking
-
-Hvis deployment feiler:
-- Sjekk Actions-fanen i GitHub for feilmeldinger
-- Verifiser at alle secrets er riktig konfigurert
-- Sjekk at SSH-nøkkelen har tilgang til serveren
-- Sjekk at brukeren har rettigheter til å kjøre Docker-kommandoer
+Alembic kjøres av infra-repoet før den nye versjonen får trafikk, ikke herfra.

@@ -21,6 +21,9 @@ COPY . .
 # service label does not match the service it is deploying.
 LABEL service="backend"
 
+HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
+    CMD ["python", "/app/ops/container_healthcheck.py"]
+
 # Drop root. uid 1000 is what the host directory bind-mounted at UPLOAD_DIR
 # must be owned by, so the projects app can still write uploads.
 RUN useradd -u 1000 -m appuser \

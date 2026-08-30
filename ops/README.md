@@ -1,7 +1,7 @@
 # ops/
 
 Server-side operational scripts for whichever host runs the stack. They are not part of the
-application and are not deployed by `deploy.yml`; install them explicitly:
+application and are not deployed by CI; install them explicitly:
 
 ```bash
 ssh <server>
