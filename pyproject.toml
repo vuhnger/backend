@@ -35,7 +35,7 @@ dependencies = [
     # Rate limiting is built straight on `limits` (see apps/shared/rate_limit.py);
     # slowapi was dropped because its route-introspection approach broke silently.
     "limits==5.8.0",
-    "pydantic-settings>=2.14.2",
+    "pydantic-settings>=2.15.0",
     "structlog>=26.1.0",
 ]
 
