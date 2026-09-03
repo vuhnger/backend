@@ -17,7 +17,7 @@ dependencies = [
     "psycopg2-binary==2.9.12",
     # External APIs. stravalib 2.x is a pydantic-2 rewrite (plain-number
     # quantities, changed iterators) — see apps/strava/client.py.
-    "stravalib>=2.5,<3.0",
+    "stravalib>=2.6.0,<3.0",
     # httpx is our sole HTTP client for code we write (sync + async).
     "httpx>=0.28,<0.29",
     # Direct again, but only to subclass requests.Session: stravalib talks to

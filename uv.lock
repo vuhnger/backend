@@ -141,7 +141,7 @@ requires-dist = [
     { name = "python-multipart", specifier = "==0.0.32" },
     { name = "requests", specifier = ">=2.34.2,<3.0" },
     { name = "sqlalchemy", specifier = ">=2.0.52,<2.1" },
-    { name = "stravalib", specifier = ">=2.5,<3.0" },
+    { name = "stravalib", specifier = ">=2.6.0,<3.0" },
     { name = "structlog", specifier = ">=26.1.0" },
     { name = "uvicorn", extras = ["standard"], specifier = "==0.52.4" },
 ]
@@ -908,7 +908,7 @@ wheels = [
 
 [[package]]
 name = "stravalib"
-version = "2.5.0"
+version = "2.6.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "arrow" },
@@ -916,9 +916,9 @@ dependencies = [
     { name = "pydantic" },
     { name = "requests" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/e8/61/a3c43433e06dd2edfb249a99e7740802d2c64b2f8d5126a64118263cb75c/stravalib-2.5.0.tar.gz", hash = "sha256:d97a845a30c861bc65a854423b201497f0ea56ba5a763294b8d886269bbe6fe3", size = 4129391, upload-time = "2026-06-01T13:24:26.124Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/b4/12/13845a2c5f1eb99271ea7156b23d200a5e7fa55659aa18e8c020d3638944/stravalib-2.6.0.tar.gz", hash = "sha256:6aef4055ea3e7cae4977b2d1a30cc8a054c487658e07d3d06bb3b90074025790", size = 4137141, upload-time = "2026-08-27T07:01:17.626Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/f4/0a/9c510377cca40b6bebe915d451126db413391664db88ff50fe02a7be7709/stravalib-2.5.0-py3-none-any.whl", hash = "sha256:723422a3f06fd7f213b9b4b813f730a481fd0869b5b5e6a350f4823a1063d092", size = 128193, upload-time = "2026-06-01T13:24:24.697Z" },
+    { url = "https://files.pythonhosted.org/packages/fb/b7/dbf85ef7bff9a3cdfb8c7664d43259ac100f36bb10d17d629f70c74613a4/stravalib-2.6.0-py3-none-any.whl", hash = "sha256:5c111066e706eaf94aa908dd0308480dc541dc9e903d17058ab3b682863f5d09", size = 134519, upload-time = "2026-08-27T07:01:15.684Z" },
 ]
 
 [[package]]
