@@ -44,7 +44,7 @@ dependencies = [
 # caps at pytest<9, which is what broke the old requirements.txt. >=1.0 supports
 # pytest 9.
 dev = [
-    "mypy>=2.3.0",
+    "mypy>=2.3.1",
     "pre-commit>=4.6.2",
     "pytest==9.1.1",
     "pytest-asyncio>=1.0",
