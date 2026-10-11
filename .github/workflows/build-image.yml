@@ -50,3 +50,12 @@ jobs:
           tags: |
             ${{ env.IMAGE }}:${{ github.event.workflow_run.head_sha }}
             ${{ env.IMAGE }}:latest
+
+      - name: Ask vuhnger/infra to deploy the image
+        env:
+          GH_TOKEN: ${{ secrets.INFRA_DISPATCH_TOKEN }}
+          VERSION: ${{ github.event.workflow_run.head_sha }}
+        run: >-
+          timeout 60 gh api --method POST repos/vuhnger/infra/dispatches
+          -f event_type=backend-image-published
+          -f "client_payload[version]=$VERSION"
