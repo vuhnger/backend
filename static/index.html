@@ -95,22 +95,11 @@
                 <div class="service-meta" id="meta-wakatime">Kodingsstatistikk</div>
                 <div class="service-url">https://api.vuhnger.dev/wakatime</div>
             </div>
-
-            <!-- n8n -->
-            <div class="service-card" id="card-n8n">
-                <div class="service-header">
-                    <span class="service-name">⚙️ n8n instansen</span>
-                    <span class="service-status" id="status-n8n">Sjekker...</span>
-                </div>
-                <div class="service-meta" id="meta-n8n">Automatiserer arbeidsflyter og overvåker, feilsøker og reparerer økosystemet med KI.</div>
-                <div class="service-url">https://n8n.vuhnger.dev</div>
-            </div>
         </div>
 
         <div class="links">
             <a href="/strava/docs" class="btn btn-primary">Strava Docs</a>
             <a href="/wakatime/docs" class="btn btn-primary">Wakatime Docs</a>
-            <a href="/n8n/docs" class="btn btn-primary">N8N Docs</a>
             <a href="https://vuhnger.dev" class="btn btn-secondary" target="_blank">Nettside</a>
         </div>
 
@@ -122,8 +111,7 @@
     <script>
         const services = [
             { id: 'strava', url: '/strava/health' },
-            { id: 'wakatime', url: '/wakatime/health' },
-            { id: 'n8n', url: '/n8n/health' }
+            { id: 'wakatime', url: '/wakatime/health' }
         ];
 
         services.forEach(service => {

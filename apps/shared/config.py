@@ -1,8 +1,8 @@
 """Centralized, typed configuration.
 
 Replaces scattered ``os.getenv`` calls with a single validated ``Settings``
-object. Fields are optional at the type level because the four apps need
-different subsets (n8n needs no DB or secrets); each module still asserts the
+object. Fields are optional at the type level because the apps need
+different subsets (site needs no DB); each module still asserts the
 specific values it requires, so the fail-fast behaviour is preserved while the
 config lives in one typed place.
 """
@@ -92,9 +92,6 @@ class Settings(BaseSettings):
     wakatime_client_secret: str | None = None
     wakatime_redirect_uri: str | None = None
     wakatime_owner_user_id: str | None = None
-
-    # n8n upstream the health proxy checks. Was hardcoded in apps/n8n/main.py.
-    n8n_url: str | None = "https://n8n.vuhnger.dev"
 
     # Projects uploads
     upload_dir: str = "/uploads/projects"

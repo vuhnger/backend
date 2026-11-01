@@ -55,12 +55,6 @@ services:
     ports:
       - "127.0.0.1:5002:5002"
 
-  n8n-api:
-    <<: *app-base
-    command: ["uvicorn", "apps.n8n.main:app", "--host", "0.0.0.0", "--port", "5004", "--reload", "--proxy-headers", "--forwarded-allow-ips", "*"]
-    ports:
-      - "127.0.0.1:5004:5004"
-
   projects-api:
     <<: *app-base
     command: ["uvicorn", "apps.projects.main:app", "--host", "0.0.0.0", "--port", "5005", "--reload", "--proxy-headers", "--forwarded-allow-ips", "*"]
