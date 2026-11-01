@@ -14,7 +14,6 @@ from sqlalchemy import engine_from_config, pool
 import apps.projects.models  # noqa: F401
 
 # Importing the model modules registers their tables on Base.metadata.
-# (n8n has no models, so it is intentionally absent.)
 import apps.strava.models  # noqa: F401
 import apps.wakatime.models  # noqa: F401
 from alembic import context

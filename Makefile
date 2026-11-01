@@ -54,7 +54,7 @@ dev-psql: ## Open a psql shell on the dev database
 	$(DEV) exec db psql -U $${POSTGRES_USER:-backend_user} -d $${POSTGRES_DB:-backend_db}
 
 headers: ## Curl security headers from each running app
-	@for p in 5001 5002 5004 5005; do \
+	@for p in 5001 5002 5005; do \
 		echo "--- localhost:$$p ---"; \
 		curl -s -D - -o /dev/null http://localhost:$$p/ 2>/dev/null | \
 		grep -iE 'content-security-policy|x-frame-options|x-content-type-options|strict-transport-security|cache-control' || echo "  (no response)"; \

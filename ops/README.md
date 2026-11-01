@@ -102,11 +102,11 @@ ls -lt /mnt/docker-data/backups/postgres/
 # <placeholder> pasted into a shell is parsed as a redirection, not a filename.
 DUMP=/mnt/docker-data/backups/postgres/backend_db-20260725T091048Z.dump
 
-docker compose stop strava-api wakatime-api projects-api site-api n8n-api
+docker compose stop strava-api wakatime-api projects-api site-api
 docker exec -i backend-db-1 sh -c \
   'pg_restore -U "$POSTGRES_USER" -d "$POSTGRES_DB" --clean --if-exists' \
   < "$DUMP"
-docker compose start strava-api wakatime-api projects-api site-api n8n-api
+docker compose start strava-api wakatime-api projects-api site-api
 ```
 
 Backups are on `/dev/sdb`, a separate physical volume from the root disk, but still

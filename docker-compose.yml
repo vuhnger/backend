@@ -67,23 +67,6 @@ services:
     networks:
       - backend
 
-  n8n-api:
-    image: ghcr.io/vuhnger/backend:${BACKEND_TAG:-latest}
-    command: ["uvicorn", "apps.n8n.main:app", "--host", "0.0.0.0", "--port", "5004", "--proxy-headers", "--forwarded-allow-ips", "*"]
-    restart: unless-stopped
-    ports:
-      - "127.0.0.1:5004:5004"
-    healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:5004/n8n/health', timeout=4).status==200 else 1)"]
-      interval: 30s
-      timeout: 5s
-      retries: 3
-      start_period: 10s
-    environment:
-      INTERNAL_API_KEY: ${INTERNAL_API_KEY}
-    networks:
-      - backend
-
   wakatime-api:
     image: ghcr.io/vuhnger/backend:${BACKEND_TAG:-latest}
     command: ["uvicorn", "apps.wakatime.main:app", "--host", "0.0.0.0", "--port", "5002", "--proxy-headers", "--forwarded-allow-ips", "*"]

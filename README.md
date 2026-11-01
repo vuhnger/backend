@@ -931,7 +931,7 @@ make headers              # curl security headers from each app
 make dev-down             # stop (keeps the db volume)
 ```
 
-Apps: Strava `:5001`, WakaTime `:5002`, n8n `:5004`, projects `:5005`. Postgres is exposed on `:5432`.
+Apps: Strava `:5001`, WakaTime `:5002`, projects `:5005`. Postgres is exposed on `:5432`.
 
 ### Local Setup (without Docker)
 

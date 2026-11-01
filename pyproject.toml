@@ -1,7 +1,7 @@
 [project]
 name = "backend"
 version = "0.1.0"
-description = "Personal backend services (Strava, WakaTime, n8n, projects)"
+description = "Personal backend services (Strava, WakaTime, projects, site)"
 requires-python = ">=3.11,<3.12"
 dependencies = [
     # FastAPI and web server. Pydantic 2 + a Starlette new enough for httpx 0.28
